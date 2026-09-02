@@ -1,0 +1,28 @@
+{
+  "name": "rsc-boundary",
+  "version": "0.1.0",
+  "private": true,
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "scan": "node ./dist/cli.js scan",
+    "dev": "ts-node src/cli.ts",
+    "test": "echo \"no tests yet\" && exit 0",
+    "lint": "eslint . --ext .ts,.tsx"
+  },
+  "bin": {
+    "rsc-boundary": "dist/cli.js"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "typescript": "^5.0.0",
+    "ts-node": "^10.0.0",
+    "eslint": "^8.0.0",
+    "@typescript-eslint/parser": "^6.0.0",
+    "@typescript-eslint/eslint-plugin": "^6.0.0"
+  }
+}
