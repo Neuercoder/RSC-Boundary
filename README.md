@@ -2,28 +2,69 @@
 
 Static data-leak analyzer for Next.js / React Server Components (RSC).
 
-Goal: detect sensitive values (env secrets, DB records, session tokens, etc.) flow from server-only sources into RSC boundaries and client components.
+Detects sensitive values (env secrets, DB records, session tokens, etc.)
+flowing from server-only sources into RSC boundaries and client components.
 
-Quick start
+## Quick start
 
-1. Install dependencies and build:
+```bash
+npm install
+npm run build
+npm run scan -- <path>          # human-readable findings
+npm run scan -- <path> --json   # findings as JSON (CI-friendly)
+```
 
-   npm install
-   npm run build
+Exit codes: `0` = clean, `1` = findings, `2` = usage/runtime error.
 
-2. Run the scanner locally (after building):
+## What it detects
 
-   npm run scan -- <path>
+| ruleId | What it flags |
+| --- | --- |
+| `rsc/client-boundary-prop` | Sensitive value passed as a prop/child to a local `"use client"` component |
+| `rsc/server-only-export` | Server module exports a sensitive value (`export` of env-derived/DB-derived data) |
+| `rsc/external-sink` | Sensitive value reaches `console.*`, `alert`, `postMessage` |
+| `rsc/client-imports-server` | A `"use client"` file imports a server module (`server-only`, `db`, `prisma`, …) |
 
-What I scaffolded
+Sources tracked: `process.env.*`, sensitive names (`token`, `password`,
+`secret`, `apiKey`, credentials, …), imports from server/db modules, data
+source calls (`db.*`, `prisma.*`, `sql`, …), and per-request data
+(`cookies()`, `headers()`, `draftMode()`). See the
+[specification](docs/specs/core-taint-analysis.md) for the full rules.
 
-- CLI entrypoint (src/cli.ts) and core analyzer skeleton (src/analyzer.ts)
-- TypeScript config and package.json with a simple build + scan script
-- GitHub Actions CI to run build/tests
-- README with overview and next steps
+## Configuration
 
-Next steps (suggested):
-- Implement TypeScript AST-based taint analysis in src/analyzer.ts
-- Add tests and example fixtures (Next.js apps) to validate findings
-- Wire up serializers and DTO suggestions
-- Add suppression rules and config format
+Optional `.rscboundaryrc.json` / `rscboundary.config.json` at the scan root or
+any parent directory — customize sources, external sinks, excludes, and
+suppressions:
+
+```jsonc
+{
+  "sources": { "serverModules": ["^server-only$", "lib/server"] },
+  "exclude": ["test/e2e"],
+  "suppress": [{ "ruleId": "rsc/external-sink" }]
+}
+```
+
+## Development
+
+```bash
+npm install
+npm run build   # type-check + emit to dist/
+npm test        # build + node:test suite (analyzer + CLI)
+npm run lint    # eslint
+```
+
+Fixtures live in `test/fixtures/` (leaky / clean / member-read apps).
+CI (`.github/workflows/ci.yml`) runs install, build, test, and lint.
+
+## Documentation
+
+- Behavior and CLI contract: [docs/specs/core-taint-analysis.md](docs/specs/core-taint-analysis.md)
+- Milestone tracker: [docs/milestones/](docs/milestones/)
+
+## Current status
+
+Implemented milestone **2026-09-03 — Core AST Taint Engine** (CLI, analyzer,
+config, tests, CI). Known limitations (see spec §11): `@/` path aliases,
+member JSX components, `export *` traversal, and cross-module type-aware
+dataflow are not yet covered.
