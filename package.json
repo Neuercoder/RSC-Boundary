@@ -8,7 +8,7 @@
     "build": "tsc -p tsconfig.build.json",
     "scan": "node ./dist/cli.js scan",
     "dev": "ts-node src/cli.ts",
-    "test": "echo \"no tests yet\" && exit 0",
+    "test": "npm run build && tsc -p tsconfig.test.json && node --test dist-test/test/*.test.js",
     "lint": "eslint . --ext .ts,.tsx"
   },
   "bin": {
@@ -17,12 +17,14 @@
   "engines": {
     "node": ">=20"
   },
-  "dependencies": {},
+  "dependencies": {
+    "typescript": "^5.0.0"
+  },
   "devDependencies": {
-    "typescript": "^5.0.0",
-    "ts-node": "^10.0.0",
-    "eslint": "^8.0.0",
+    "@types/node": "^20.0.0",
+    "@typescript-eslint/eslint-plugin": "^6.0.0",
     "@typescript-eslint/parser": "^6.0.0",
-    "@typescript-eslint/eslint-plugin": "^6.0.0"
+    "eslint": "^8.0.0",
+    "ts-node": "^10.0.0"
   }
 }
