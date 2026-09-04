@@ -31,6 +31,11 @@ export interface RscBoundaryConfig {
   serverModules?: string[];
   /** Regex patterns for callee expressions that are external sinks, e.g. `^console\\.log`. */
   externalSinks?: string[];
+  /** tsconfig-style path aliases used to resolve non-relative import specifiers:
+   * alias pattern -> replacement paths (relative to the project root). A `*`
+   * wildcard in the alias captures a specifier segment that is substituted
+   * into every `*` in its replacement paths, e.g. `"@/*": ["./*"]`. */
+  pathAliases?: Record<string, string[]>;
   /** Path substrings (relative to the scan root) to skip while scanning. */
   exclude?: string[];
   /** Findings to suppress. */
@@ -77,6 +82,9 @@ const DEFAULT_EXTERNAL_SINKS = [
   "^postMessage\\b",
 ];
 
+/** Next.js convention: `@/*` maps to the project root (tsconfig default). */
+const DEFAULT_PATH_ALIASES: Record<string, string[]> = { "@/*": ["./*"] };
+
 const DEFAULT_EXCLUDE = [".next", ".nuxt", "node_modules", "coverage"];
 
 export function defaultConfig(): RscBoundaryConfig {
@@ -86,6 +94,7 @@ export function defaultConfig(): RscBoundaryConfig {
     sourceCalls: [...DEFAULT_SOURCE_CALLS],
     serverModules: [...DEFAULT_SERVER_MODULES],
     externalSinks: [...DEFAULT_EXTERNAL_SINKS],
+    pathAliases: { ...DEFAULT_PATH_ALIASES },
     exclude: [...DEFAULT_EXCLUDE],
     suppress: [],
   };
@@ -105,6 +114,13 @@ export function mergeConfig(base: RscBoundaryConfig, overrides: RscBoundaryConfi
 
 function isStringArray(value: unknown): value is string[] {
   return Array.isArray(value) && value.every((item) => typeof item === "string");
+}
+
+function isPathAliases(value: unknown): value is Record<string, string[]> {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+    return false;
+  }
+  return Object.values(value).every(isStringArray);
 }
 
 function isSuppression(value: unknown): value is Suppression {
@@ -137,6 +153,10 @@ function parseConfig(raw: unknown): RscBoundaryConfig | null {
   config.serverModules = pickArray(sources, "serverModules");
   config.externalSinks = pickArray(root, "externalSinks");
   config.exclude = pickArray(root, "exclude");
+  const pathAliases = root.pathAliases;
+  if (isPathAliases(pathAliases)) {
+    config.pathAliases = pathAliases;
+  }
   const suppress = root.suppress;
   if (Array.isArray(suppress)) {
     const parsed = suppress.filter(isSuppression);

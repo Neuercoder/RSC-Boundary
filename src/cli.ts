@@ -67,7 +67,14 @@ export function runScan(argv: string[], cwd: string): ScanCliResult {
     fs.statSync(resolved).isDirectory() ? resolved : path.dirname(resolved),
   );
   const files = collectFiles(resolved, loaded.config);
-  const result = analyzeFiles(files, { config: loaded.config });
+  // Path aliases resolve against the project root: the config file's
+  // directory when one exists, otherwise the scan target root.
+  const rootDir = loaded.configPath
+    ? path.dirname(loaded.configPath)
+    : fs.statSync(resolved).isDirectory()
+      ? resolved
+      : path.dirname(resolved);
+  const result = analyzeFiles(files, { config: loaded.config, rootDir });
 
   const findRoot = fs.statSync(resolved).isDirectory() ? resolved : path.dirname(resolved);
   const relative = (file: string): string =>

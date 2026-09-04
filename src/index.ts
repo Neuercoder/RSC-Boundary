@@ -9,6 +9,7 @@
 export {
   analyzeFiles,
   collectFiles,
+  resolveImport,
   resolveRelativeImport,
   RULES,
 } from "./analyzer";

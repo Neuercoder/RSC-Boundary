@@ -8,6 +8,8 @@ import { runScan } from "../src/cli";
 const FIXTURES = path.resolve(__dirname, "..", "..", "test", "fixtures");
 const LEAKY = path.join(FIXTURES, "leaky");
 const CLEAN = path.join(FIXTURES, "clean");
+const ALIASES = path.join(FIXTURES, "aliases");
+const ALIAS_CONFIG = path.join(FIXTURES, "alias-config");
 const CLI = path.resolve(__dirname, "..", "..", "dist", "cli.js");
 
 test("runScan reports findings and exit code 1 for a leaking fixture", () => {
@@ -27,6 +29,27 @@ test("runScan reports clean and exit code 0 for a clean fixture", () => {
   const result = runScan([CLEAN, "--json"], process.cwd());
   assert.equal(result.code, 0);
   assert.equal(result.findings.length, 0);
+});
+
+test("runScan resolves @/ imports with the default alias mapping", () => {
+  const result = runScan([ALIASES, "--json"], process.cwd());
+  assert.equal(result.code, 1);
+  assert.ok(
+    result.findings.some((finding) => finding.ruleId === "rsc/client-boundary-prop"),
+    JSON.stringify(result.findings, null, 2),
+  );
+  assert.ok(
+    result.findings.some((finding) => finding.ruleId === "rsc/server-only-export"),
+    JSON.stringify(result.findings, null, 2),
+  );
+});
+
+test("runScan resolves custom pathAliases from the config file", () => {
+  const result = runScan([ALIAS_CONFIG, "--json"], process.cwd());
+  assert.equal(result.code, 1);
+  const boundary = result.findings.filter((finding) => finding.ruleId === "rsc/client-boundary-prop");
+  assert.ok(boundary.length >= 1, JSON.stringify(result.findings, null, 2));
+  assert.ok(boundary.some((finding) => finding.message.includes('prop "text"')), JSON.stringify(boundary, null, 2));
 });
 
 test("runScan human output is clean for a clean fixture", () => {
