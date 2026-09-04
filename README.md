@@ -40,6 +40,7 @@ suppressions:
 ```jsonc
 {
   "sources": { "serverModules": ["^server-only$", "lib/server"] },
+  "pathAliases": { "@/*": ["./*"], "@ui/*": ["./src/components/*"] },
   "exclude": ["test/e2e"],
   "suppress": [{ "ruleId": "rsc/external-sink" }]
 }
@@ -60,11 +61,13 @@ CI (`.github/workflows/ci.yml`) runs install, build, test, and lint.
 ## Documentation
 
 - Behavior and CLI contract: [docs/specs/core-taint-analysis.md](docs/specs/core-taint-analysis.md)
+- Import path-alias resolution (`@/*`): [docs/specs/path-alias-resolution.md](docs/specs/path-alias-resolution.md)
 - Milestone tracker: [docs/milestones/](docs/milestones/)
 
 ## Current status
 
-Implemented milestone **2026-09-03 — Core AST Taint Engine** (CLI, analyzer,
-config, tests, CI). Known limitations (see spec §11): `@/` path aliases,
-member JSX components, `export *` traversal, and cross-module type-aware
-dataflow are not yet covered.
+Implemented milestones **2026-09-03 — Core AST Taint Engine** (CLI, analyzer,
+config, tests, CI) and **2026-09-04 — Path Alias Resolution** (`@/` and
+custom tsconfig-style import aliases, default `"@/*": ["./*"]`). Known
+limitations (see spec §11): member JSX components, `export *` traversal, and
+cross-module type-aware dataflow are not yet covered.

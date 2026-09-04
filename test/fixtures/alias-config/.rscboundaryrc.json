@@ -1,0 +1,5 @@
+{
+  "pathAliases": {
+    "@ui/*": ["./components/*"]
+  }
+}

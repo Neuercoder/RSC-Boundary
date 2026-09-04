@@ -45,6 +45,8 @@ export const RULES = {
 
 export interface AnalyzeOptions {
   config?: RscBoundaryConfig;
+  /** Project root used to resolve `pathAliases` import specifiers. Defaults to `process.cwd()`. */
+  rootDir?: string;
 }
 
 const MAX_PASSES = 6;
@@ -125,12 +127,9 @@ function tryParse(file: string): ts.SourceFile | null {
   }
 }
 
-/** Resolve a relative import specifier from `fromFile` to an absolute file path, if any. */
-export function resolveRelativeImport(fromFile: string, specifier: string): string | null {
-  if (!specifier.startsWith(".")) {
-    return null;
-  }
-  const base = path.resolve(path.dirname(fromFile), specifier);
+/** Try to resolve `base` with extension and `index.*` fallbacks (the module
+ * resolution shape of the TS compiler after tsconfig `paths` substitution). */
+function tryResolveFile(base: string): string | null {
   for (const ext of IMPORT_EXTENSIONS) {
     if (fs.existsSync(base + ext) && fs.statSync(base + ext).isFile()) {
       return base + ext;
@@ -148,8 +147,65 @@ export function resolveRelativeImport(fromFile: string, specifier: string): stri
   return null;
 }
 
+/** Resolve a relative import specifier from `fromFile` to an absolute file path, if any. */
+export function resolveRelativeImport(fromFile: string, specifier: string): string | null {
+  if (!specifier.startsWith(".")) {
+    return null;
+  }
+  const base = path.resolve(path.dirname(fromFile), specifier);
+  return tryResolveFile(base);
+}
+
+/**
+ * Resolve any import specifier (relative or tsconfig path-aliased) from
+ * `fromFile` to an absolute file path, if any.
+ *
+ * Relative specifiers (`./x`) resolve as `resolveRelativeImport`. Non-relative
+ * specifiers are matched against `config.pathAliases` (default `{ "@/*":
+ * ["./*"] }`): a `*` in the alias pattern captures the remainder of the
+ * specifier, which is substituted into each replacement path; the result is
+ * resolved against `rootDir`. Only one path per alias needs to exist.
+ */
+export function resolveImport(
+  fromFile: string,
+  specifier: string,
+  config: RscBoundaryConfig,
+  rootDir: string,
+): string | null {
+  if (specifier.startsWith(".")) {
+    return resolveRelativeImport(fromFile, specifier);
+  }
+  const aliases = config.pathAliases ?? {};
+  for (const [alias, paths] of Object.entries(aliases)) {
+    const star = alias.indexOf("*");
+    let captured: string | null = null;
+    if (star === -1) {
+      if (specifier !== alias) {
+        continue;
+      }
+      captured = "";
+    } else {
+      const prefix = alias.slice(0, star);
+      const suffix = alias.slice(star + 1);
+      if (!specifier.startsWith(prefix) || !specifier.endsWith(suffix)) {
+        continue;
+      }
+      captured = specifier.slice(prefix.length, specifier.length - suffix.length);
+    }
+    for (const pattern of paths) {
+      const base = path.resolve(rootDir, pattern.replace(/\*/g, captured));
+      const resolved = tryResolveFile(base);
+      if (resolved) {
+        return resolved;
+      }
+    }
+  }
+  return null;
+}
+
 export function analyzeFiles(files: string[], options: AnalyzeOptions = {}): AnalyzeResult {
   const config = options.config ?? {};
+  const rootDir = options.rootDir ?? process.cwd();
 
   const analyses = new Map<string, FileAnalysis>();
   const clientFiles = new Set<string>();
@@ -183,7 +239,7 @@ export function analyzeFiles(files: string[], options: AnalyzeOptions = {}): Ana
   for (let pass = 0; pass < MAX_PASSES; pass++) {
     let changed = false;
     for (const analysis of analyses.values()) {
-      const walker = new FileWalker(analysis, clientFiles, config, false);
+      const walker = new FileWalker(analysis, clientFiles, config, rootDir, false);
       changed = walker.run() || changed;
     }
     if (!changed) {
@@ -193,7 +249,7 @@ export function analyzeFiles(files: string[], options: AnalyzeOptions = {}): Ana
 
   // Final pass: emit findings against the settled taint sets.
   for (const analysis of analyses.values()) {
-    new FileWalker(analysis, clientFiles, config, true).run();
+    new FileWalker(analysis, clientFiles, config, rootDir, true).run();
   }
 
   const findings: Finding[] = [];
@@ -234,6 +290,7 @@ class FileWalker {
     private analysis: FileAnalysis,
     private readonly clientFiles: Set<string>,
     private readonly config: RscBoundaryConfig,
+    private readonly rootDir: string,
     private readonly emitFindings: boolean,
   ) {}
 
@@ -429,27 +486,26 @@ class FileWalker {
       );
     }
 
-    // Index local client components for the JSX boundary rule.
-    if (specifier.startsWith(".")) {
-      const resolved = resolveRelativeImport(this.analysis.file, specifier);
-      if (resolved && this.clientFiles.has(resolved)) {
-        const bindings = node.importClause;
-        const names: string[] = [];
-        if (bindings?.name) {
-          names.push(bindings.name.text);
-        }
-        if (bindings?.namedBindings) {
-          if (ts.isNamespaceImport(bindings.namedBindings)) {
-            names.push(bindings.namedBindings.name.text);
-          } else {
-            for (const el of bindings.namedBindings.elements) {
-              names.push(el.name.text);
-            }
+    // Index local client components for the JSX boundary rule. Relative
+    // (`./x`) and tsconfig path-aliased (`@/x`) specifiers are both resolved.
+    const resolved = resolveImport(this.analysis.file, specifier, this.config, this.rootDir);
+    if (resolved && this.clientFiles.has(resolved)) {
+      const bindings = node.importClause;
+      const names: string[] = [];
+      if (bindings?.name) {
+        names.push(bindings.name.text);
+      }
+      if (bindings?.namedBindings) {
+        if (ts.isNamespaceImport(bindings.namedBindings)) {
+          names.push(bindings.namedBindings.name.text);
+        } else {
+          for (const el of bindings.namedBindings.elements) {
+            names.push(el.name.text);
           }
         }
-        for (const name of names) {
-          this.analysis.elementToFile.set(name, resolved);
-        }
+      }
+      for (const name of names) {
+        this.analysis.elementToFile.set(name, resolved);
       }
     }
 

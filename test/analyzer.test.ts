@@ -2,16 +2,17 @@ import assert from "node:assert/strict";
 import * as path from "node:path";
 import { test } from "node:test";
 
-import { analyzeFiles, collectFiles, RULES } from "../src/analyzer";
-import { defaultConfig } from "../src/config";
+import { analyzeFiles, collectFiles, resolveImport, RULES } from "../src/analyzer";
+import { defaultConfig, RscBoundaryConfig } from "../src/config";
 
 const FIXTURES = path.resolve(__dirname, "..", "..", "test", "fixtures");
 const LEAKY = path.join(FIXTURES, "leaky");
 const CLEAN = path.join(FIXTURES, "clean");
+const ALIASES = path.join(FIXTURES, "aliases");
 
 function analyze(dir: string, config = defaultConfig()) {
   const files = collectFiles(dir, config);
-  return analyzeFiles(files, { config });
+  return analyzeFiles(files, { config, rootDir: dir });
 }
 
 function byRule(findings: ReturnType<typeof analyzeFiles>["findings"], ruleId: string) {
@@ -117,4 +118,58 @@ test("default-parameter taint does not depend on sensitive-name matching", () =>
     exports.some((finding) => finding.message.includes("buildAuthHeader")),
     `expected buildAuthHeader export finding, got ${JSON.stringify(exports, null, 2)}`,
   );
+});
+
+test("resolveImport resolves @/ aliases against the project root", () => {
+  const from = path.join(ALIASES, "app", "page.tsx");
+  const resolved = resolveImport(from, "@/lib/server/session", defaultConfig(), ALIASES);
+  assert.equal(resolved, path.join(ALIASES, "lib", "server", "session.ts"));
+  const card = resolveImport(from, "@/components/card", defaultConfig(), ALIASES);
+  assert.equal(card, path.join(ALIASES, "components", "card.tsx"));
+});
+
+test("resolveImport honors custom pathAliases with wildcard capture", () => {
+  const config: RscBoundaryConfig = {
+    pathAliases: {
+      "@components/*": ["./src/components/*", "./components/*"],
+      "@lib/server/session": ["./lib/server/session.ts"],
+    },
+  };
+  const from = path.join(ALIASES, "app", "page.tsx");
+  assert.equal(
+    resolveImport(from, "@components/card", config, ALIASES),
+    path.join(ALIASES, "components", "card.tsx"),
+  );
+  assert.equal(
+    resolveImport(from, "@lib/server/session", config, ALIASES),
+    path.join(ALIASES, "lib", "server", "session.ts"),
+  );
+});
+
+test("flags tainted props through @/ aliased client-component imports", () => {
+  const result = analyze(ALIASES);
+  const boundary = byRule(result.findings, RULES.CLIENT_BOUNDARY_PROP);
+  assert.ok(boundary.length >= 2, JSON.stringify(result.findings, null, 2));
+  assert.ok(
+    boundary.some((finding) => finding.message.includes('prop "apiKey"')),
+    JSON.stringify(boundary, null, 2),
+  );
+  assert.ok(
+    boundary.some((finding) => finding.message.includes('prop "title"')),
+    JSON.stringify(boundary, null, 2),
+  );
+  // The alias-imported server module contributes the taint chain.
+  assert.ok(
+    boundary.some((finding) =>
+      finding.sources.some((source) => source.includes("server module")),
+    ),
+    JSON.stringify(boundary, null, 2),
+  );
+});
+
+test("flags sensitive exports from an @/-aliased server module", () => {
+  const result = analyze(ALIASES);
+  const exports = byRule(result.findings, RULES.SERVER_ONLY_EXPORT);
+  assert.ok(exports.length >= 1, JSON.stringify(result.findings, null, 2));
+  assert.ok(exports[0].file.endsWith("lib/server/session.ts"));
 });

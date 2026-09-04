@@ -76,9 +76,10 @@ Taint flows through (conservative, per-file, fixpoint over ≤ 6 passes):
 | `rsc/external-sink` | warning | Tainted argument reaches a callee matching `externalSinks` (default `console.*`, `alert`, `postMessage`). |
 | `rsc/client-imports-server` | error | A `"use client"` file imports a module matching `sources.serverModules`. |
 
-Client-component resolution currently covers **relative imports only**; name
-aliases (`@/…`) and member components (`<Foo.Bar>`) are acknowledged
-limitations.
+Client-component resolution covers **relative imports** (`./card`) and
+tsconfig-style **path aliases** (`@/components/card`, see
+[path-alias-resolution.md](path-alias-resolution.md)); member components
+(`<Foo.Bar>`) are an acknowledged limitation.
 
 ## 7. Configuration
 
@@ -94,6 +95,7 @@ located at the scan root or any ancestor:
     "serverModules": ["^server-only$", "lib/server"]
   },
   "externalSinks": ["^console\\.log$", "^postMessage\\b"],
+  "pathAliases": { "@/*": ["./*"], "@ui/*": ["./src/components/*"] },
   "exclude": ["test/e2e", "generated"],
   "suppress": [
     { "ruleId": "rsc/external-sink", "file": "shared/logger.ts" },
@@ -104,7 +106,9 @@ located at the scan root or any ancestor:
 
 Arrays replace defaults entirely. `suppress` entries match a finding only when
 *all* provided fields match (file substring, exact ruleId, message substring,
-exact 1-based line).
+exact 1-based line). `pathAliases` maps tsconfig-style import aliases to
+replacement paths and ships with the Next.js default `"@/*": ["./*"]`; see
+[path-alias-resolution.md](path-alias-resolution.md).
 
 ## 8. CLI contract
 
@@ -138,8 +142,8 @@ Exit code `1` on findings makes the scanner CI-gateable.
 ## 9. Programmatic API
 
 `src/index.ts` exports `analyzeFiles(files, { config })`, `collectFiles(target,
-config)`, `resolveRelativeImport`, `RULES`, and the config model
-(`loadConfig`, `defaultConfig`, `mergeConfig`).
+config)`, `resolveRelativeImport`, `resolveImport`, `RULES`, and the config
+model (`loadConfig`, `defaultConfig`, `mergeConfig`).
 
 ## 10. Verification evidence
 
@@ -150,9 +154,9 @@ config)`, `resolveRelativeImport`, `RULES`, and the config model
 
 ## 11. Limitations and non-goals (this version)
 
-- No TS path-alias resolution (`@/` imports) — relative imports only.
 - Member JSX components (`<Foo.Bar>`) and `export * from` re-exports are
-  skipped.
+  skipped (path aliases such as `@/*` are now supported — see
+  [path-alias-resolution.md](path-alias-resolution.md)).
 - Data sources are matched by name/call patterns, not by full type-aware
   dataflow across modules; false positives are expected and suppressible.
 - No serializers/DTO suggestions, no fix/auto-rewrite, no Next.js API-route or
