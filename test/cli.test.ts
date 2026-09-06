@@ -10,6 +10,7 @@ const LEAKY = path.join(FIXTURES, "leaky");
 const CLEAN = path.join(FIXTURES, "clean");
 const ALIASES = path.join(FIXTURES, "aliases");
 const ALIAS_CONFIG = path.join(FIXTURES, "alias-config");
+const MEMBER_JSX = path.join(FIXTURES, "member-jsx");
 const CLI = path.resolve(__dirname, "..", "..", "dist", "cli.js");
 
 test("runScan reports findings and exit code 1 for a leaking fixture", () => {
@@ -50,6 +51,25 @@ test("runScan resolves custom pathAliases from the config file", () => {
   const boundary = result.findings.filter((finding) => finding.ruleId === "rsc/client-boundary-prop");
   assert.ok(boundary.length >= 1, JSON.stringify(result.findings, null, 2));
   assert.ok(boundary.some((finding) => finding.message.includes('prop "text"')), JSON.stringify(boundary, null, 2));
+});
+
+test("runScan flags member JSX component leaks", () => {
+  const result = runScan([MEMBER_JSX, "--json"], process.cwd());
+  assert.equal(result.code, 1);
+  const boundary = result.findings.filter((finding) => finding.ruleId === "rsc/client-boundary-prop");
+  assert.ok(boundary.length >= 3, JSON.stringify(result.findings, null, 2));
+  assert.ok(
+    boundary.some((finding) => finding.message.includes("<Card.Header>")),
+    JSON.stringify(boundary, null, 2),
+  );
+  assert.ok(
+    boundary.some((finding) => finding.message.includes("<Panel.Item>")),
+    JSON.stringify(boundary, null, 2),
+  );
+  assert.ok(
+    boundary.some((finding) => finding.message.includes("<Card.Body>")),
+    JSON.stringify(boundary, null, 2),
+  );
 });
 
 test("runScan human output is clean for a clean fixture", () => {
