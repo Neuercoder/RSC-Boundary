@@ -76,10 +76,12 @@ Taint flows through (conservative, per-file, fixpoint over ≤ 6 passes):
 | `rsc/external-sink` | warning | Tainted argument reaches a callee matching `externalSinks` (default `console.*`, `alert`, `postMessage`). |
 | `rsc/client-imports-server` | error | A `"use client"` file imports a module matching `sources.serverModules`. |
 
-Client-component resolution covers **relative imports** (`./card`) and
+Client-component resolution covers **relative imports** (`./card`),
 tsconfig-style **path aliases** (`@/components/card`, see
-[path-alias-resolution.md](path-alias-resolution.md)); member components
-(`<Foo.Bar>`) are an acknowledged limitation.
+[path-alias-resolution.md](path-alias-resolution.md)), and **member tags**
+(`<Card.Header>`, `<Panel.Item>`, `<UI.Card.Body>`) whose leftmost
+identifier is a client-component binding or namespace import — see
+[member-jsx-components.md](member-jsx-components.md).
 
 ## 7. Configuration
 
@@ -154,9 +156,9 @@ model (`loadConfig`, `defaultConfig`, `mergeConfig`).
 
 ## 11. Limitations and non-goals (this version)
 
-- Member JSX components (`<Foo.Bar>`) and `export * from` re-exports are
-  skipped (path aliases such as `@/*` are now supported — see
-  [path-alias-resolution.md](path-alias-resolution.md)).
+- Member JSX components (`<Foo.Bar>`) are now supported — see
+  [member-jsx-components.md](member-jsx-components.md); `export * from`
+  re-exports are still skipped.
 - Data sources are matched by name/call patterns, not by full type-aware
   dataflow across modules; false positives are expected and suppressible.
 - No serializers/DTO suggestions, no fix/auto-rewrite, no Next.js API-route or

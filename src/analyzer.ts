@@ -776,14 +776,11 @@ class FileWalker {
       return; // already in the browser; upstream sources were flagged elsewhere
     }
     const opening = ts.isJsxSelfClosingElement(node) ? node : node.openingElement;
-    const tag = opening.tagName;
-    if (!ts.isIdentifier(tag) || /^[a-z]/.test(tag.text)) {
-      return; // member components and intrinsic host elements are skipped
+    const resolved = this.resolveClientTag(opening.tagName);
+    if (!resolved) {
+      return; // intrinsic host element or not a local "use client" component
     }
-    const targetFile = this.analysis.elementToFile.get(tag.text);
-    if (!targetFile || !this.clientFiles.has(targetFile)) {
-      return; // not a local "use client" component
-    }
+    const tagText = resolved.text;
 
     for (const property of opening.attributes.properties) {
       if (ts.isJsxAttribute(property)) {
@@ -797,7 +794,7 @@ class FileWalker {
               node,
               RULES.CLIENT_BOUNDARY_PROP,
               "error",
-              `Sensitive value flows into client component <${tag.text}> prop "${propName}"`,
+              `Sensitive value flows into client component <${tagText}> prop "${propName}"`,
               reasons,
             );
           }
@@ -809,7 +806,7 @@ class FileWalker {
             node,
             RULES.CLIENT_BOUNDARY_PROP,
             "error",
-            `Sensitive values spread into client component <${tag.text}>`,
+            `Sensitive values spread into client component <${tagText}>`,
             reasons,
           );
         }
@@ -825,13 +822,39 @@ class FileWalker {
               node,
               RULES.CLIENT_BOUNDARY_PROP,
               "error",
-              `Sensitive value is rendered inside client component <${tag.text}>`,
+              `Sensitive value is rendered inside client component <${tagText}>`,
               reasons,
             );
           }
         }
       }
     }
+  }
+
+  /**
+   * Resolve a JSX tag to a locally-imported client component, if any.
+   *
+   * Supports plain identifier tags (`<Card>`) and member-expression tags
+   * (`<Card.Header>`, `<Panel.Item>`, `<UI.Card.Body>`) whose leftmost
+   * identifier is a client-component binding or namespace import. Intrinsic
+   * host elements (lowercase tags) and unknown components are skipped.
+   */
+  private resolveClientTag(tag: ts.JsxTagNameExpression): { text: string; file: string } | null {
+    if (!ts.isIdentifier(tag) && !ts.isPropertyAccessExpression(tag)) {
+      return null; // namespaced names (<svg:path>) are not component refs
+    }
+    let base: ts.Expression = tag;
+    while (ts.isPropertyAccessExpression(base)) {
+      base = base.expression;
+    }
+    if (!ts.isIdentifier(base) || /^[a-z]/.test(base.text)) {
+      return null; // intrinsic host element or non-identifier tag
+    }
+    const targetFile = this.analysis.elementToFile.get(base.text);
+    if (!targetFile || !this.clientFiles.has(targetFile)) {
+      return null; // not a local "use client" component
+    }
+    return { text: tag.getText(this.analysis.sf), file: targetFile };
   }
 
   // -------------------------------------------------------------------------

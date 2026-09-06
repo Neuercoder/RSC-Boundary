@@ -9,6 +9,7 @@ const FIXTURES = path.resolve(__dirname, "..", "..", "test", "fixtures");
 const LEAKY = path.join(FIXTURES, "leaky");
 const CLEAN = path.join(FIXTURES, "clean");
 const ALIASES = path.join(FIXTURES, "aliases");
+const MEMBER_JSX = path.join(FIXTURES, "member-jsx");
 
 function analyze(dir: string, config = defaultConfig()) {
   const files = collectFiles(dir, config);
@@ -172,4 +173,24 @@ test("flags sensitive exports from an @/-aliased server module", () => {
   const exports = byRule(result.findings, RULES.SERVER_ONLY_EXPORT);
   assert.ok(exports.length >= 1, JSON.stringify(result.findings, null, 2));
   assert.ok(exports[0].file.endsWith("lib/server/session.ts"));
+});
+
+test("flags tainted props and children on member JSX components (<Foo.Bar>)", () => {
+  const result = analyze(MEMBER_JSX);
+  const boundary = byRule(result.findings, RULES.CLIENT_BOUNDARY_PROP);
+  assert.ok(boundary.length >= 3, JSON.stringify(result.findings, null, 2));
+  assert.ok(
+    boundary.some((finding) => finding.message.includes('<Card.Header> prop "title"')),
+    JSON.stringify(boundary, null, 2),
+  );
+  assert.ok(
+    boundary.some((finding) => finding.message.includes('<Panel.Item> prop "apiKey"')),
+    JSON.stringify(boundary, null, 2),
+  );
+  assert.ok(
+    boundary.some((finding) => finding.message.includes("inside client component <Card.Body>")),
+    JSON.stringify(boundary, null, 2),
+  );
+  // A member tag with a non-tainted prop stays silent.
+  assert.ok(!boundary.some((finding) => finding.message.includes('prop "subtitle"')));
 });
