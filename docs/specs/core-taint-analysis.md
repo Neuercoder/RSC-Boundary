@@ -157,8 +157,10 @@ model (`loadConfig`, `defaultConfig`, `mergeConfig`).
 ## 11. Limitations and non-goals (this version)
 
 - Member JSX components (`<Foo.Bar>`) are now supported — see
-  [member-jsx-components.md](member-jsx-components.md); `export * from`
-  re-exports are still skipped.
+  [member-jsx-components.md](member-jsx-components.md) — and so is
+  re-export traversal (`export * from`, `export { x } from`,
+  `export * as ns from` barrel chains) — see
+  [re-export-traversal.md](re-export-traversal.md).
 - Data sources are matched by name/call patterns, not by full type-aware
   dataflow across modules; false positives are expected and suppressible.
 - No serializers/DTO suggestions, no fix/auto-rewrite, no Next.js API-route or

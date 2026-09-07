@@ -10,6 +10,7 @@ const LEAKY = path.join(FIXTURES, "leaky");
 const CLEAN = path.join(FIXTURES, "clean");
 const ALIASES = path.join(FIXTURES, "aliases");
 const MEMBER_JSX = path.join(FIXTURES, "member-jsx");
+const RE_EXPORT = path.join(FIXTURES, "re-export");
 
 function analyze(dir: string, config = defaultConfig()) {
   const files = collectFiles(dir, config);
@@ -193,4 +194,65 @@ test("flags tainted props and children on member JSX components (<Foo.Bar>)", ()
   );
   // A member tag with a non-tainted prop stays silent.
   assert.ok(!boundary.some((finding) => finding.message.includes('prop "subtitle"')));
+});
+
+test("flags barrels re-exporting sensitive values (export *, named, namespace)", () => {
+  const result = analyze(RE_EXPORT);
+  const exports = byRule(result.findings, RULES.SERVER_ONLY_EXPORT);
+  // export * barrel: both the value and the function chain through.
+  assert.ok(
+    exports.some(
+      (finding) =>
+        finding.file.endsWith("lib/barrel.ts") && finding.message.includes('"API_TOKEN"'),
+    ),
+    JSON.stringify(exports, null, 2),
+  );
+  assert.ok(
+    exports.some(
+      (finding) =>
+        finding.file.endsWith("lib/barrel.ts") && finding.message.includes('"getSession"'),
+    ),
+    JSON.stringify(exports, null, 2),
+  );
+  // export { x } from: flagged on the barrel.
+  assert.ok(
+    exports.some((finding) => finding.file.endsWith("lib/named.ts")),
+    JSON.stringify(exports, null, 2),
+  );
+  // export * as ns from: namespace finding on the barrel.
+  assert.ok(
+    exports.some(
+      (finding) =>
+        finding.file.endsWith("lib/ns.ts") && finding.message.includes('"secrets"'),
+    ),
+    JSON.stringify(exports, null, 2),
+  );
+  // Two-hop export * chain: both hops flagged.
+  assert.ok(
+    exports.some((finding) => finding.file.endsWith("lib/chain-a.ts")),
+    JSON.stringify(exports, null, 2),
+  );
+  assert.ok(
+    exports.some((finding) => finding.file.endsWith("lib/mid.ts")),
+    JSON.stringify(exports, null, 2),
+  );
+});
+
+test("importers of barrels inherit taint, incl. client components via barrels", () => {
+  const result = analyze(RE_EXPORT);
+  const boundary = byRule(result.findings, RULES.CLIENT_BOUNDARY_PROP);
+  // <Card> itself arrives through lib/ui-barrel.ts (export * of a client file).
+  assert.ok(
+    boundary.some((finding) => finding.message.includes('prop "apiKey"')),
+    JSON.stringify(boundary, null, 2),
+  );
+  assert.ok(
+    boundary.some((finding) => finding.message.includes('prop "title"')),
+    JSON.stringify(boundary, null, 2),
+  );
+});
+
+test("re-export cycles do not hang the analyzer", () => {
+  const result = analyze(RE_EXPORT);
+  assert.ok(result.findings.length > 0);
 });
