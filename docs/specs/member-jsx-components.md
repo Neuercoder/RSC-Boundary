@@ -66,10 +66,10 @@ app/page.tsx:11:7  error  rsc/client-boundary-prop  Sensitive value is rendered 
 
 ## 5. Known limits
 
-- The base identifier must be a *direct* import binding of a client file —
-  member access on a locally-defined server component, or on a component
-  re-exported from a barrel, is not followed (that is `export *` traversal,
-  tracked separately in the core specification).
+- The base identifier must be a *direct* import binding of a client file,
+  or resolve to one through a barrel's `export *` chain — see
+  [re-export-traversal.md](re-export-traversal.md). Member access on a
+  locally-defined server component is not followed.
 - Type-aware resolution (is this property access really a component?) is not
   performed: any member of a client component is conservatively treated as a
   client boundary, matching React's composition semantics.

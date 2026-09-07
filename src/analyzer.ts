@@ -13,6 +13,11 @@
  *     becomes tainted even when `user` is not.
  *   - Sinks are evaluated once the taint sets reach a fixpoint (capped at
  *     MAX_PASSES), so findings carry the most specific provenance chain.
+ *   - Re-export edges (`export * from`, `export { x } from`,
+ *     `export * as ns from`) are followed across scanned files (alias-aware,
+ *     cycle-safe): barrels re-exporting sensitive values are flagged, their
+ *     importers inherit the taint, and client components imported through
+ *     barrels still resolve as client boundaries.
  */
 
 import * as fs from "fs";
@@ -63,6 +68,16 @@ interface FileAnalysis {
   serverBindings: Map<string, string>;
   /** JSX element name -> resolved absolute file of a local client component. */
   elementToFile: Map<string, string>;
+  /** Named-export re-export edges: exported name -> resolved target file + local name. */
+  reExportBindings: Map<string, { file: string; local: string }>;
+  /** `export *` source files (resolved), followed during the export-traversal fixpoint. */
+  starReExports: Set<string>;
+  /** `export * as ns from` namespace bindings: namespace name -> resolved target file. */
+  starNamespaces: Map<string, string>;
+  /** Resolved files this file imports from (import edges for server-module propagation). */
+  importSources: Set<string>;
+  /** Namespace-import binding name -> resolved file, for member reads (`ns.secret`) and member tags (`<UI.Card>`). */
+  namespaceImports: Map<string, string>;
   /** Expression key -> taint reasons. */
   taint: Map<string, string[]>;
   findings: Finding[];
@@ -228,6 +243,11 @@ export function analyzeFiles(files: string[], options: AnalyzeOptions = {}): Ana
       serverReason: null,
       serverBindings: new Map(),
       elementToFile: new Map(),
+      reExportBindings: new Map(),
+      starReExports: new Set(),
+      starNamespaces: new Map(),
+      importSources: new Set(),
+      namespaceImports: new Map(),
       taint: new Map(),
       findings: [],
       seenFindingKeys: new Set(),
@@ -239,9 +259,17 @@ export function analyzeFiles(files: string[], options: AnalyzeOptions = {}): Ana
   for (let pass = 0; pass < MAX_PASSES; pass++) {
     let changed = false;
     for (const analysis of analyses.values()) {
-      const walker = new FileWalker(analysis, clientFiles, config, rootDir, false);
+      const walker = new FileWalker(
+        analysis,
+        analyses,
+        clientFiles,
+        config,
+        rootDir,
+        false,
+      );
       changed = walker.run() || changed;
     }
+    changed = propagateReExports(analyses, config, rootDir) || changed;
     if (!changed) {
       break;
     }
@@ -249,7 +277,7 @@ export function analyzeFiles(files: string[], options: AnalyzeOptions = {}): Ana
 
   // Final pass: emit findings against the settled taint sets.
   for (const analysis of analyses.values()) {
-    new FileWalker(analysis, clientFiles, config, rootDir, true).run();
+    new FileWalker(analysis, analyses, clientFiles, config, rootDir, true).run();
   }
 
   const findings: Finding[] = [];
@@ -282,12 +310,409 @@ function isSuppressed(finding: Finding, suppress: Suppression[]): boolean {
   });
 }
 
+/**
+ * Cross-file re-export propagation between fixpoint passes.
+ *
+ * Each scanned file's taint set is per-file, so taint entering through a
+ * barrel hop (`import { x } from "./barrel"`, `ns.x` on a namespace import,
+ * or a member read `barrel.x` where `barrel` is a re-export edge) must be
+ * copied explicitly once the exporting module's own taint has settled. This
+ * runs after every pass's walkers: for each import edge, resolve the imported
+ * name through the target's export chain (named hops, nested `export *`,
+ * `export * as ns` namespaces) and taint the local binding with the
+ * declaring module's provenance. Reports whether any taint set grew.
+ */
+function propagateReExports(
+  analyses: Map<string, FileAnalysis>,
+  config: RscBoundaryConfig,
+  rootDir: string,
+): boolean {
+  let changed = false;
+  const addTaint = (target: FileAnalysis, key: string, reason: string): void => {
+    const existing = target.taint.get(key);
+    if (!existing) {
+      target.taint.set(key, [reason]);
+      changed = true;
+    } else if (!existing.includes(reason)) {
+      existing.push(reason);
+      changed = true;
+    }
+  };
+  const taintReasonsFor = (target: FileAnalysis, name: string): string[] => {
+    const tracked = target.taint.get(name);
+    if (tracked) {
+      return tracked.slice(0, 3);
+    }
+    const serverBinding = target.serverBindings.get(name);
+    if (serverBinding) {
+      return [`binding from server module "${serverBinding}"`];
+    }
+    return [];
+  };
+  const exportedNameReasons = (
+    file: string,
+    name: string,
+    visited: Set<string>,
+  ): string[] => {
+    if (visited.has(file)) {
+      return [];
+    }
+    visited.add(file);
+    const target = analyses.get(file);
+    if (!target) {
+      return [];
+    }
+    if (isExportedName(target, name)) {
+      return taintReasonsFor(target, name);
+    }
+    const hop = target.reExportBindings.get(name);
+    if (hop && !visited.has(hop.file)) {
+      const reasons = exportedNameReasons(hop.file, hop.local, visited);
+      if (reasons.length > 0) {
+        return reasons;
+      }
+    }
+    for (const star of target.starReExports) {
+      const reasons = exportedNameReasons(star, name, visited);
+      if (reasons.length > 0) {
+        return reasons;
+      }
+    }
+    return [];
+  };
+  const namespaceReasons = (
+    file: string,
+    visited: Set<string>,
+  ): string[] => {
+    if (visited.has(file)) {
+      return [];
+    }
+    visited.add(file);
+    const target = analyses.get(file);
+    if (!target) {
+      return [];
+    }
+    const reasons = firstExportedReasons(analyses, target, visited, exportedNameReasons, taintReasonsFor);
+    if (reasons.length > 0) {
+      return reasons;
+    }
+    return [];
+  };
+  for (const analysis of analyses.values()) {
+    for (const statement of analysis.sf.statements) {
+      if (!ts.isImportDeclaration(statement) || !statement.importClause || !ts.isStringLiteral(statement.moduleSpecifier)) {
+        continue;
+      }
+      const resolved = resolveImport(analysis.file, statement.moduleSpecifier.text, config, rootDir);
+      if (!resolved || !analyses.has(resolved)) {
+        continue;
+      }
+      const clause = statement.importClause;
+      if (clause.name) {
+        // Default imports cannot name a star-exported binding (`export *`
+        // excludes defaults), so only direct default exports propagate here.
+        const direct = analyses.get(resolved);
+        if (direct && isExportedName(direct, "default")) {
+          const reasons =
+            direct.taint.get("default") ??
+            (direct.serverBindings.get("default")
+              ? [`binding from server module "${direct.serverBindings.get("default")}"`]
+              : []);
+          for (const reason of reasons.slice(0, 3)) {
+            addTaint(analysis, clause.name.text, reason);
+          }
+        } else if (direct) {
+          for (const star of direct.starReExports) {
+            const reasons = exportedNameReasons(star, "default", new Set([analysis.file, resolved]));
+            for (const reason of reasons) {
+              addTaint(analysis, clause.name.text, reason);
+            }
+          }
+        }
+      }
+      const named = clause.namedBindings;
+      if (named) {
+        if (ts.isNamespaceImport(named)) {
+          const reasons = namespaceReasons(resolved, new Set([analysis.file]));
+          if (reasons.length > 0) {
+            addTaint(analysis, named.name.text, `namespace re-export from "${statement.moduleSpecifier.text}" (${reasons[0]})`);
+          }
+        } else {
+          for (const el of named.elements) {
+            const imported = el.propertyName?.text ?? el.name.text;
+            const reasons = exportedNameReasons(resolved, imported, new Set([analysis.file]));
+            for (const reason of reasons) {
+              addTaint(analysis, el.name.text, reason);
+            }
+          }
+        }
+      }
+    }
+  }
+  // Barrels re-exporting sensitive values are server modules: a file that
+  // re-exports a tainted name (or namespace) out of another scanned file is
+  // itself an exporter of sensitive data, even without its own `server-only`
+  // import. Without this, `processExport`'s `serverReason` guard would skip
+  // exactly those `export *` / `export { x } from` findings.
+  for (const analysis of analyses.values()) {
+    if (analysis.serverReason !== null) {
+      continue;
+    }
+    if (reExportsSensitive(analyses, analysis)) {
+      analysis.serverReason = "re-exports sensitive value";
+      changed = true;
+    }
+  }
+  return changed;
+}
+
+/**
+ * Whether `analysis` re-exports at least one sensitive name (or sensitive
+ * namespace) out of another scanned file in `analyses`. Inspects only
+ * cross-file edges (`export *`, `export { x } from`, `export * as ns from`),
+ * not the file's own declarations — a pure sensitive declaration with its
+ * own `server-only` import is marked server elsewhere.
+ */
+function reExportsSensitive(analyses: Map<string, FileAnalysis>, analysis: FileAnalysis): boolean {
+  const taintReasonsFor = (target: FileAnalysis, name: string): string[] => {
+    const tracked = target.taint.get(name);
+    if (tracked) {
+      return tracked.slice(0, 3);
+    }
+    const serverBinding = target.serverBindings.get(name);
+    if (serverBinding) {
+      return [`binding from server module "${serverBinding}"`];
+    }
+    return [];
+  };
+  const exportedNameReasons = (
+    file: string,
+    name: string,
+    visited: Set<string>,
+  ): string[] => {
+    if (visited.has(file)) {
+      return [];
+    }
+    visited.add(file);
+    const target = analyses.get(file);
+    if (!target) {
+      return [];
+    }
+    if (isExportedName(target, name)) {
+      return taintReasonsFor(target, name);
+    }
+    const hop = target.reExportBindings.get(name);
+    if (hop && !visited.has(hop.file)) {
+      const reasons = exportedNameReasons(hop.file, hop.local, visited);
+      if (reasons.length > 0) {
+        return reasons;
+      }
+    }
+    for (const star of target.starReExports) {
+      const reasons = exportedNameReasons(star, name, visited);
+      if (reasons.length > 0) {
+        return reasons;
+      }
+    }
+    return [];
+  };
+  for (const hop of analysis.reExportBindings.values()) {
+    if (exportedNameReasons(hop.file, hop.local, new Set([analysis.file])).length > 0) {
+      return true;
+    }
+  }
+  for (const star of analysis.starReExports) {
+    const target = analyses.get(star);
+    if (!target) {
+      continue;
+    }
+    if (firstExportedReasons(analyses, target, new Set([analysis.file]), exportedNameReasons, taintReasonsFor).length > 0) {
+      return true;
+    }
+  }
+  for (const starFile of analysis.starNamespaces.values()) {
+    const target = analyses.get(starFile);
+    if (!target) {
+      continue;
+    }
+    if (firstExportedReasons(analyses, target, new Set([analysis.file]), exportedNameReasons, taintReasonsFor).length > 0) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/** Whether `name` is declared (and exported, or a re-exportable import) in `target`'s own source. */
+function isExportedName(target: FileAnalysis, name: string): boolean {
+  for (const statement of target.sf.statements) {
+    if (
+      (ts.isVariableStatement(statement) || ts.isFunctionDeclaration(statement) || ts.isClassDeclaration(statement)) &&
+      (ts.getCombinedModifierFlags(statement as ts.Declaration) & ts.ModifierFlags.Export) !== 0
+    ) {
+      if (ts.isVariableStatement(statement)) {
+        if (
+          statement.declarationList.declarations.some(
+            (decl) => ts.isIdentifier(decl.name) && decl.name.text === name,
+          )
+        ) {
+          return true;
+        }
+      } else if (statement.name?.text === name) {
+        return true;
+      }
+    }
+    if (ts.isExportDeclaration(statement) && statement.exportClause && ts.isNamedExports(statement.exportClause)) {
+      if (!statement.moduleSpecifier) {
+        for (const el of statement.exportClause.elements) {
+          const local = el.propertyName ?? el.name;
+          if (ts.isIdentifier(el.name) && el.name.text === name && ts.isIdentifier(local) && locallyDeclared(target, local.text)) {
+            return true;
+          }
+        }
+      }
+    }
+    if (ts.isExportAssignment(statement) && !statement.isExportEquals && name === "default") {
+      return true;
+    }
+  }
+  return false;
+}
+
+function locallyDeclared(target: FileAnalysis, name: string): boolean {
+  for (const statement of target.sf.statements) {
+    if (ts.isVariableStatement(statement)) {
+      if (statement.declarationList.declarations.some((decl) => ts.isIdentifier(decl.name) && decl.name.text === name)) {
+        return true;
+      }
+    } else if (
+      (ts.isFunctionDeclaration(statement) || ts.isClassDeclaration(statement)) &&
+      statement.name?.text === name
+    ) {
+      return true;
+    } else if (ts.isImportDeclaration(statement)) {
+      const clause = statement.importClause;
+      if (clause?.name?.text === name) {
+        return true;
+      }
+      const named = clause?.namedBindings;
+      if (named) {
+        if (ts.isNamespaceImport(named) && named.name.text === name) {
+          return true;
+        }
+        if (ts.isNamedImports(named) && named.elements.some((el) => el.name.text === name)) {
+          return true;
+        }
+      }
+    }
+  }
+  return false;
+}
+
+/**
+ * First sensitive name exported by `target` (own declarations, local
+ * `export { x }`, `export { x } from` hops, then nested `export *`),
+ * with the declaring module's provenance. Cycle-safe via `visited`.
+ */
+function firstExportedReasons(
+  analyses: Map<string, FileAnalysis>,
+  target: FileAnalysis,
+  visited: Set<string>,
+  exportedNameReasons: (file: string, name: string, visited: Set<string>) => string[],
+  taintReasonsFor: (target: FileAnalysis, name: string) => string[],
+): string[] {
+  for (const statement of target.sf.statements) {
+    if (
+      (ts.isVariableStatement(statement) || ts.isFunctionDeclaration(statement) || ts.isClassDeclaration(statement)) &&
+      (ts.getCombinedModifierFlags(statement as ts.Declaration) & ts.ModifierFlags.Export) !== 0
+    ) {
+      if (ts.isVariableStatement(statement)) {
+        for (const decl of statement.declarationList.declarations) {
+          if (ts.isIdentifier(decl.name)) {
+            const reasons = taintReasonsFor(target, decl.name.text);
+            if (reasons.length > 0) {
+              return reasons;
+            }
+          }
+        }
+      } else if (statement.name) {
+        const reasons = taintReasonsFor(target, statement.name.text);
+        if (reasons.length > 0) {
+          return reasons;
+        }
+      }
+    }
+    if (
+      ts.isExportDeclaration(statement) &&
+      statement.exportClause &&
+      ts.isNamedExports(statement.exportClause)
+    ) {
+      for (const el of statement.exportClause.elements) {
+        const local = el.propertyName ?? el.name;
+        if (!ts.isIdentifier(local) || !ts.isIdentifier(el.name)) {
+          continue;
+        }
+        if (!statement.moduleSpecifier) {
+          const reasons = taintReasonsFor(target, local.text);
+          if (reasons.length > 0) {
+            return reasons;
+          }
+          continue;
+        }
+        if (ts.isStringLiteral(statement.moduleSpecifier)) {
+          const hopTarget = target.reExportBindings.get(el.name.text);
+          if (hopTarget && !visited.has(hopTarget.file)) {
+            const reasons = exportedNameReasons(hopTarget.file, hopTarget.local, visited);
+            if (reasons.length > 0) {
+              return reasons;
+            }
+          }
+        }
+      }
+    }
+    if (ts.isExportAssignment(statement) && !statement.isExportEquals) {
+      const reasons = taintReasonsFor(target, "default");
+      if (reasons.length > 0) {
+        return reasons;
+      }
+    }
+  }
+  for (const hop of target.reExportBindings.values()) {
+    if (visited.has(hop.file)) {
+      continue;
+    }
+    const next = hop.file;
+    visited.add(next);
+    const nextTarget = analyses.get(next);
+    if (nextTarget) {
+      const reasons = firstExportedReasons(analyses, nextTarget, visited, exportedNameReasons, taintReasonsFor);
+      if (reasons.length > 0) {
+        return reasons;
+      }
+    }
+  }
+  for (const star of target.starReExports) {
+    if (visited.has(star)) {
+      continue;
+    }
+    visited.add(star);
+    const nextTarget = analyses.get(star);
+    if (nextTarget) {
+      const reasons = firstExportedReasons(analyses, nextTarget, visited, exportedNameReasons, taintReasonsFor);
+      if (reasons.length > 0) {
+        return reasons;
+      }
+    }
+  }
+  return [];
+}
+
 class FileWalker {
   private changed = false;
   private readonly patternsCache = new Map<string, RegExp>();
 
   constructor(
     private analysis: FileAnalysis,
+    private readonly analyses: Map<string, FileAnalysis>,
     private readonly clientFiles: Set<string>,
     private readonly config: RscBoundaryConfig,
     private readonly rootDir: string,
@@ -488,24 +913,35 @@ class FileWalker {
 
     // Index local client components for the JSX boundary rule. Relative
     // (`./x`) and tsconfig path-aliased (`@/x`) specifiers are both resolved.
+    // Barrel re-exports (`export *` / `export { x } from`) are traversed so a
+    // client component imported through a barrel still resolves. Import edges
+    // and namespace bindings are recorded for server-module propagation and
+    // `ns.member` re-export resolution.
     const resolved = resolveImport(this.analysis.file, specifier, this.config, this.rootDir);
-    if (resolved && this.clientFiles.has(resolved)) {
-      const bindings = node.importClause;
-      const names: string[] = [];
-      if (bindings?.name) {
-        names.push(bindings.name.text);
-      }
-      if (bindings?.namedBindings) {
-        if (ts.isNamespaceImport(bindings.namedBindings)) {
-          names.push(bindings.namedBindings.name.text);
-        } else {
-          for (const el of bindings.namedBindings.elements) {
-            names.push(el.name.text);
+    if (resolved) {
+      this.analysis.importSources.add(resolved);
+      const clientTarget = this.resolveClientTarget(resolved);
+      if (clientTarget) {
+        const bindings = node.importClause;
+        const names: string[] = [];
+        if (bindings?.name) {
+          names.push(bindings.name.text);
+        }
+        if (bindings?.namedBindings) {
+          if (ts.isNamespaceImport(bindings.namedBindings)) {
+            names.push(bindings.namedBindings.name.text);
+          } else {
+            for (const el of bindings.namedBindings.elements) {
+              names.push(el.name.text);
+            }
           }
         }
+        for (const name of names) {
+          this.analysis.elementToFile.set(name, clientTarget);
+        }
       }
-      for (const name of names) {
-        this.analysis.elementToFile.set(name, resolved);
+      if (node.importClause?.namedBindings && ts.isNamespaceImport(node.importClause.namedBindings)) {
+        this.analysis.namespaceImports.set(node.importClause.namedBindings.name.text, resolved);
       }
     }
 
@@ -721,6 +1157,7 @@ class FileWalker {
   }
 
   private processExport(node: ts.ExportDeclaration | ts.ExportAssignment): void {
+    this.indexReExport(node);
     if (!this.analysis.serverReason) {
       return;
     }
@@ -741,24 +1178,37 @@ class FileWalker {
       return;
     }
     if (!node.exportClause) {
-      return; // `export * from "..."` — names would need re-export traversal
+      this.emitStarReExport(node);
+      return;
     }
     if (ts.isNamespaceExport(node.exportClause)) {
+      const name = node.exportClause.name.text;
       const reasons = this.taintReasons(node.exportClause.name);
-      if (reasons.length > 0) {
+      const namespaceReasons = reasons.length > 0 ? reasons : this.starNamespaceReasons(name);
+      // `export * as ns from "./mod"` always carries the namespace binding,
+      // even when an unrelated local `ns` currently shadows it for taint
+      // purposes: namespace member taint (e.g. a sensitive property read on
+      // the source module) is resolved through the target module instead.
+      const emitReasons = reasons.length > 0 ? reasons : namespaceReasons;
+      if (emitReasons.length > 0) {
         this.emit(
           node,
           RULES.SERVER_ONLY_EXPORT,
           "error",
-          `Server module re-exports sensitive namespace "${node.exportClause.name.text}"`,
-          reasons,
+          `Server module re-exports sensitive namespace "${name}"`,
+          emitReasons,
         );
       }
       return;
     }
     for (const el of node.exportClause.elements) {
       const local = el.propertyName ?? el.name;
-      const reasons = this.taintReasons(local);
+      let reasons = this.taintReasons(local);
+      if (reasons.length === 0 && node.moduleSpecifier) {
+        // `export { x } from "./mod"`: resolve through the source module so
+        // re-exported sensitive values are flagged on the barrel as well.
+        reasons = this.reExportedReasons(node.moduleSpecifier, local.text, new Set([this.analysis.file]));
+      }
       if (reasons.length > 0) {
         this.emit(
           node,
@@ -769,6 +1219,514 @@ class FileWalker {
         );
       }
     }
+  }
+
+  /**
+   * Record re-export edges for the cross-file traversal: `export * from`
+   * sources, `export { x } from` name mappings, and `export * as ns from`
+   * namespace bindings. Import/export specifiers resolve exactly like imports
+   * (relative + `pathAliases`), and unresolvable or unscanned targets are
+   * ignored. Safe to run on every pass (edge sets only grow).
+   */
+  private indexReExport(node: ts.ExportDeclaration | ts.ExportAssignment): void {
+    if (!ts.isExportDeclaration(node) || !node.moduleSpecifier || !ts.isStringLiteral(node.moduleSpecifier)) {
+      return;
+    }
+    const resolved = resolveImport(this.analysis.file, node.moduleSpecifier.text, this.config, this.rootDir);
+    if (!resolved) {
+      return;
+    }
+    if (!node.exportClause) {
+      // `export * from "./mod"`
+      this.analysis.starReExports.add(resolved);
+      return;
+    }
+    if (ts.isNamespaceExport(node.exportClause)) {
+      // `export * as ns from "./mod"`
+      this.analysis.starNamespaces.set(node.exportClause.name.text, resolved);
+      return;
+    }
+    for (const el of node.exportClause.elements) {
+      const local = el.propertyName ?? el.name;
+      if (ts.isIdentifier(local) && ts.isIdentifier(el.name)) {
+        this.analysis.reExportBindings.set(el.name.text, { file: resolved, local: local.text });
+      }
+    }
+  }
+
+  /**
+   * Follow a barrel's `export *` chain to the file where `name` is declared,
+   * then return that declaration's taint reasons. Follows `export { x }`
+   * hops along the way; visited files guard against re-export cycles.
+   */
+  private reExportedReasons(
+    specifier: ts.Expression,
+    name: string,
+    visited: Set<string>,
+  ): string[] {
+    if (!ts.isStringLiteral(specifier)) {
+      return [];
+    }
+    const resolved = resolveImport(this.analysis.file, specifier.text, this.config, this.rootDir);
+    if (!resolved) {
+      return [];
+    }
+    return this.exportedNameReasons(resolved, name, visited);
+  }
+
+  /** Taint provenance for exported `name` in `file`, following barrel hops. */
+  private exportedNameReasons(file: string, name: string, visited: Set<string>): string[] {
+    if (visited.has(file)) {
+      return [];
+    }
+    visited.add(file);
+    const target = this.analyses.get(file);
+    if (!target) {
+      return [];
+    }
+    // Direct declaration in the target file wins over further hops.
+    if (this.isExportedName(target, name)) {
+      return this.taintReasonsFor(target, name);
+    }
+    const hop = target.reExportBindings.get(name);
+    if (hop && !visited.has(hop.file)) {
+      const reasons = this.exportedNameReasons(hop.file, hop.local, visited);
+      if (reasons.length > 0) {
+        return reasons;
+      }
+    }
+    for (const star of target.starReExports) {
+      const reasons = this.exportedNameReasons(star, name, visited);
+      if (reasons.length > 0) {
+        return reasons;
+      }
+    }
+    return [];
+  }
+
+  /** Whether `name` is declared (and exported) in `target`'s own source. */
+  private isExportedName(target: FileAnalysis, name: string): boolean {
+    for (const statement of target.sf.statements) {
+      if (
+        (ts.isVariableStatement(statement) || ts.isFunctionDeclaration(statement) || ts.isClassDeclaration(statement)) &&
+        (ts.getCombinedModifierFlags(statement as ts.Declaration) & ts.ModifierFlags.Export) !== 0
+      ) {
+        if (ts.isVariableStatement(statement)) {
+          if (
+            statement.declarationList.declarations.some(
+              (decl) => ts.isIdentifier(decl.name) && decl.name.text === name,
+            )
+          ) {
+            return true;
+          }
+        } else if (statement.name?.text === name) {
+          return true;
+        }
+      }
+      if (ts.isExportDeclaration(statement) && statement.exportClause && ts.isNamedExports(statement.exportClause)) {
+        if (!statement.moduleSpecifier) {
+          for (const el of statement.exportClause.elements) {
+            const local = el.propertyName ?? el.name;
+            if (ts.isIdentifier(el.name) && el.name.text === name && this.locallyDeclared(target, local.text)) {
+              return true;
+            }
+          }
+        }
+      }
+    }
+    return false;
+  }
+
+  private locallyDeclared(target: FileAnalysis, name: string): boolean {
+    for (const statement of target.sf.statements) {
+      if (ts.isVariableStatement(statement)) {
+        if (statement.declarationList.declarations.some((decl) => ts.isIdentifier(decl.name) && decl.name.text === name)) {
+          return true;
+        }
+      } else if (
+        (ts.isFunctionDeclaration(statement) || ts.isClassDeclaration(statement)) &&
+        statement.name?.text === name
+      ) {
+        return true;
+      } else if (ts.isImportDeclaration(statement)) {
+        const clause = statement.importClause;
+        if (clause?.name?.text === name) {
+          return true;
+        }
+        const named = clause?.namedBindings;
+        if (named) {
+          if (ts.isNamespaceImport(named) && named.name.text === name) {
+            return true;
+          }
+          if (ts.isNamedImports(named) && named.elements.some((el) => el.name.text === name)) {
+            return true;
+          }
+        }
+      }
+    }
+    return false;
+  }
+
+  private taintReasonsFor(target: FileAnalysis, name: string): string[] {
+    const tracked = target.taint.get(name);
+    if (tracked) {
+      return tracked.slice(0, 3);
+    }
+    const serverBinding = target.serverBindings.get(name);
+    if (serverBinding) {
+      return [`binding from server module "${serverBinding}"`];
+    }
+    return [];
+  }
+
+  /**
+   * Taint provenance for `export * as ns from` namespaces: the target
+   * module's own taint for `ns` if present, else the first sensitive export
+   * flowing through its re-export chain (cycle-safe).
+   */
+  private starNamespaceReasons(name: string): string[] {
+    const targetFile = this.analysis.starNamespaces.get(name);
+    if (!targetFile) {
+      return [];
+    }
+    const target = this.analyses.get(targetFile);
+    if (!target) {
+      return [];
+    }
+    const tracked = target.taint.get(name);
+    if (tracked) {
+      return tracked.slice(0, 3);
+    }
+    return this.firstStarExportReasons(target, new Set([this.analysis.file, targetFile]));
+  }
+
+  private firstStarExportReasons(target: FileAnalysis, visited: Set<string>): string[] {
+    for (const statement of target.sf.statements) {
+      if (
+        (ts.isVariableStatement(statement) || ts.isFunctionDeclaration(statement) || ts.isClassDeclaration(statement)) &&
+        (ts.getCombinedModifierFlags(statement as ts.Declaration) & ts.ModifierFlags.Export) !== 0
+      ) {
+        if (ts.isVariableStatement(statement)) {
+          for (const decl of statement.declarationList.declarations) {
+            if (ts.isIdentifier(decl.name)) {
+              const reasons = this.taintReasonsFor(target, decl.name.text);
+              if (reasons.length > 0) {
+                return reasons;
+              }
+            }
+          }
+        } else if (
+          (ts.isFunctionDeclaration(statement) || ts.isClassDeclaration(statement)) &&
+          statement.name
+        ) {
+          const reasons = this.taintReasonsFor(target, statement.name.text);
+          if (reasons.length > 0) {
+            return reasons;
+          }
+        }
+      }
+      if (
+        ts.isExportDeclaration(statement) &&
+        statement.exportClause &&
+        ts.isNamedExports(statement.exportClause) &&
+        !statement.moduleSpecifier
+      ) {
+        for (const el of statement.exportClause.elements) {
+          const local = el.propertyName ?? el.name;
+          if (ts.isIdentifier(local)) {
+            const reasons = this.taintReasonsFor(target, local.text);
+            if (reasons.length > 0) {
+              return reasons;
+            }
+          }
+        }
+      }
+    }
+    for (const hop of target.reExportBindings.values()) {
+      if (visited.has(hop.file)) {
+        continue;
+      }
+      visited.add(hop.file);
+      const next = this.analyses.get(hop.file);
+      if (next) {
+        const reasons = this.firstStarExportReasons(next, visited);
+        if (reasons.length > 0) {
+          return reasons;
+        }
+      }
+    }
+    for (const star of target.starReExports) {
+      if (visited.has(star)) {
+        continue;
+      }
+      visited.add(star);
+      const next = this.analyses.get(star);
+      if (next) {
+        const reasons = this.firstStarExportReasons(next, visited);
+        if (reasons.length > 0) {
+          return reasons;
+        }
+      }
+    }
+    return [];
+  }
+
+  /**
+   * Emit `rsc/server-only-export` for names this barrel's `export *` chain
+   * re-exports while sensitive in their declaring module. Names shadowed by a
+   * local declaration or a named re-export keep their local meaning and are
+   * skipped here (they are still checked through the normal export paths);
+   * cycles and unresolvable targets contribute nothing.
+   */
+  private emitStarReExport(node: ts.ExportDeclaration): void {
+    for (const { name, reasons } of this.collectStarExportReasons(new Set([this.analysis.file]))) {
+      this.emit(
+        node,
+        RULES.SERVER_ONLY_EXPORT,
+        "error",
+        `Server module re-exports sensitive value "${name}"`,
+        reasons,
+      );
+    }
+  }
+
+  private collectStarExportReasons(
+    visited: Set<string>,
+  ): Array<{ name: string; reasons: string[] }> {
+    const collected = new Map<string, string[]>();
+    const seenNames = new Set<string>();
+    for (const statement of this.analysis.sf.statements) {
+      if (
+        (ts.isVariableStatement(statement) || ts.isFunctionDeclaration(statement) || ts.isClassDeclaration(statement)) &&
+        (ts.getCombinedModifierFlags(statement as ts.Declaration) & ts.ModifierFlags.Export) !== 0
+      ) {
+        if (ts.isVariableStatement(statement)) {
+          for (const decl of statement.declarationList.declarations) {
+            if (ts.isIdentifier(decl.name)) {
+              seenNames.add(decl.name.text);
+            }
+          }
+        } else if (statement.name) {
+          seenNames.add(statement.name.text);
+        }
+      }
+      if (ts.isExportDeclaration(statement) && statement.exportClause && ts.isNamedExports(statement.exportClause)) {
+        for (const el of statement.exportClause.elements) {
+          if (ts.isIdentifier(el.name)) {
+            seenNames.add(el.name.text);
+          }
+        }
+        if (statement.moduleSpecifier && ts.isStringLiteral(statement.moduleSpecifier)) {
+          const hopTarget = resolveImport(
+            this.analysis.file,
+            statement.moduleSpecifier.text,
+            this.config,
+            this.rootDir,
+          );
+          if (hopTarget) {
+            for (const { name, reasons } of this.starExportedNames(hopTarget, visited)) {
+              if (!seenNames.has(name) && !collected.has(name)) {
+                collected.set(name, reasons);
+              }
+            }
+          }
+        }
+      }
+    }
+    for (const star of this.analysis.starReExports) {
+      for (const { name, reasons } of this.starExportedNames(star, visited)) {
+        if (!seenNames.has(name) && !collected.has(name)) {
+          collected.set(name, reasons);
+        }
+      }
+    }
+    return [...collected.entries()].map(([name, reasons]) => ({ name, reasons }));
+  }
+
+  /**
+   * Sensitive names visible through `file`'s own declarations plus its full
+   * re-export chain (`export { x }` hops and nested `export *`), each paired
+   * with the declaring module's taint provenance.
+   */
+  private starExportedNames(
+    file: string,
+    visited: Set<string>,
+  ): Array<{ name: string; reasons: string[] }> {
+    if (visited.has(file)) {
+      return [];
+    }
+    visited.add(file);
+    const target = this.analyses.get(file);
+    if (!target) {
+      return [];
+    }
+    const exported = new Map<string, string[]>();
+    for (const statement of target.sf.statements) {
+      if (
+        (ts.isVariableStatement(statement) || ts.isFunctionDeclaration(statement) || ts.isClassDeclaration(statement)) &&
+        (ts.getCombinedModifierFlags(statement as ts.Declaration) & ts.ModifierFlags.Export) !== 0
+      ) {
+        if (ts.isVariableStatement(statement)) {
+          for (const decl of statement.declarationList.declarations) {
+            if (ts.isIdentifier(decl.name)) {
+              const reasons = this.taintReasonsFor(target, decl.name.text);
+              if (reasons.length > 0) {
+                exported.set(decl.name.text, reasons);
+              }
+            }
+          }
+        } else if (statement.name) {
+          const reasons = this.taintReasonsFor(target, statement.name.text);
+          if (reasons.length > 0) {
+            exported.set(statement.name.text, reasons);
+          }
+        }
+      }
+      if (ts.isExportDeclaration(statement) && statement.exportClause && ts.isNamedExports(statement.exportClause)) {
+        for (const el of statement.exportClause.elements) {
+          const local = el.propertyName ?? el.name;
+          if (!ts.isIdentifier(el.name)) {
+            continue;
+          }
+          if (!statement.moduleSpecifier) {
+            if (ts.isIdentifier(local)) {
+              const reasons = this.taintReasonsFor(target, local.text);
+              if (reasons.length > 0) {
+                exported.set(el.name.text, reasons);
+              }
+            }
+            continue;
+          }
+          if (ts.isStringLiteral(statement.moduleSpecifier) && ts.isIdentifier(local)) {
+            const hopResolved = resolveImport(target.file, statement.moduleSpecifier.text, this.config, this.rootDir);
+            if (hopResolved) {
+              const hopWalker = new FileWalker(target, this.analyses, this.clientFiles, this.config, this.rootDir, this.emitFindings);
+              const reasons = hopWalker.exportedNameReasons(hopResolved, local.text, visited);
+              if (reasons.length > 0 && !exported.has(el.name.text)) {
+                exported.set(el.name.text, reasons);
+              }
+            }
+          }
+        }
+      }
+    }
+    for (const star of target.starReExports) {
+      for (const { name, reasons } of this.starExportedNames(star, visited)) {
+        if (!exported.has(name)) {
+          exported.set(name, reasons);
+        }
+      }
+    }
+    return [...exported.entries()].map(([name, reasons]) => ({ name, reasons }));
+  }
+
+  /**
+   * Resolve a JSX tag to a locally-imported client component, if any.
+   *
+   * Supports plain identifier tags (`<Card>`) and member-expression tags
+   * (`<Card.Header>`, `<Panel.Item>`, `<UI.Card.Body>`) whose leftmost
+   * identifier is a client-component binding or namespace import. Namespace
+   * imports of barrels that re-export a client component (`import * as UI
+   * from "./barrel"` where the barrel does `export * from "./card"`) resolve
+   * through the same barrel traversal. Intrinsic host elements (lowercase
+   * tags) and unknown components are skipped.
+   */
+  private resolveClientTag(tag: ts.JsxTagNameExpression): { text: string; file: string } | null {
+    if (!ts.isIdentifier(tag) && !ts.isPropertyAccessExpression(tag)) {
+      return null; // namespaced names (<svg:path>) are not component refs
+    }
+    let base: ts.Expression = tag;
+    while (ts.isPropertyAccessExpression(base)) {
+      base = base.expression;
+    }
+    if (!ts.isIdentifier(base) || /^[a-z]/.test(base.text)) {
+      return null; // intrinsic host element or non-identifier tag
+    }
+    const direct = this.analysis.elementToFile.get(base.text);
+    if (direct && this.resolveClientTarget(direct)) {
+      return { text: tag.getText(this.analysis.sf), file: direct };
+    }
+    // `import * as UI from "./barrel"` where the barrel re-exports a client
+    // component: any member of the namespace may be a client boundary.
+    const namespaceFile = this.analysis.namespaceImports.get(base.text);
+    if (namespaceFile && this.resolveClientTarget(namespaceFile)) {
+      return { text: tag.getText(this.analysis.sf), file: namespaceFile };
+    }
+    return null; // not a local "use client" component
+  }
+
+  /**
+   * Resolve an identifier through this file's own re-export edges (used when
+   * `processExport` checks `export { x }` of a local): named `export { x }
+   * from` hops and `export *` chains, cycle-safe. Returns the declaring
+   * module's taint provenance (or `[]` when the name is local/unresolvable).
+   */
+  private resolveLocalReExport(name: string, depth: number): string[] {
+    if (depth > 20) {
+      return [];
+    }
+    const hop = this.analysis.reExportBindings.get(name);
+    if (hop) {
+      const reasons = this.exportedNameReasons(hop.file, hop.local, new Set([this.analysis.file]));
+      if (reasons.length > 0) {
+        return reasons;
+      }
+    }
+    for (const star of this.analysis.starReExports) {
+      const reasons = this.exportedNameReasons(star, name, new Set([this.analysis.file]));
+      if (reasons.length > 0) {
+        return reasons;
+      }
+    }
+    return [];
+  }
+
+  /**
+   * Resolve `ns.member` where `ns` is a namespace import of a scanned module:
+   * follow the member through the target's export chain (named hops and
+   * `export *`), including `export * as ns from` indirection. Falls back to
+   * `[]` so ordinary sensitive-member matching still applies.
+   */
+  private resolveNamespaceMember(namespace: string, member: string): string[] {
+    const namespaceFile = this.analysis.namespaceImports.get(namespace)
+      ?? this.analysis.starNamespaces.get(namespace);
+    if (!namespaceFile) {
+      return [];
+    }
+    return this.exportedNameReasons(namespaceFile, member, new Set([this.analysis.file]));
+  }
+
+  /**
+   * Resolve a module through barrel re-exports to the file that should count
+   * for client-component detection: the module itself when it is a client
+   * file, else the first `export *` target that (transitively) is one.
+   * Named re-export hops are import bindings, not components, so they do not
+   * redirect the lookup. Cycles and unresolvable targets yield `null`.
+   */
+  private resolveClientTarget(resolved: string): string | null {
+    if (this.clientFiles.has(resolved)) {
+      return resolved;
+    }
+    const seen = new Set<string>([this.analysis.file, resolved]);
+    const queue: string[] = [resolved];
+    while (queue.length > 0) {
+      const current = queue.shift() as string;
+      const target = this.analyses.get(current);
+      if (!target) {
+        continue;
+      }
+      for (const star of target.starReExports) {
+        if (seen.has(star)) {
+          continue;
+        }
+        seen.add(star);
+        if (this.clientFiles.has(star)) {
+          return star;
+        }
+        queue.push(star);
+      }
+    }
+    return null;
   }
 
   private processJsx(node: ts.JsxElement | ts.JsxSelfClosingElement): void {
@@ -831,32 +1789,6 @@ class FileWalker {
     }
   }
 
-  /**
-   * Resolve a JSX tag to a locally-imported client component, if any.
-   *
-   * Supports plain identifier tags (`<Card>`) and member-expression tags
-   * (`<Card.Header>`, `<Panel.Item>`, `<UI.Card.Body>`) whose leftmost
-   * identifier is a client-component binding or namespace import. Intrinsic
-   * host elements (lowercase tags) and unknown components are skipped.
-   */
-  private resolveClientTag(tag: ts.JsxTagNameExpression): { text: string; file: string } | null {
-    if (!ts.isIdentifier(tag) && !ts.isPropertyAccessExpression(tag)) {
-      return null; // namespaced names (<svg:path>) are not component refs
-    }
-    let base: ts.Expression = tag;
-    while (ts.isPropertyAccessExpression(base)) {
-      base = base.expression;
-    }
-    if (!ts.isIdentifier(base) || /^[a-z]/.test(base.text)) {
-      return null; // intrinsic host element or non-identifier tag
-    }
-    const targetFile = this.analysis.elementToFile.get(base.text);
-    if (!targetFile || !this.clientFiles.has(targetFile)) {
-      return null; // not a local "use client" component
-    }
-    return { text: tag.getText(this.analysis.sf), file: targetFile };
-  }
-
   // -------------------------------------------------------------------------
   // Taint evaluation
   // -------------------------------------------------------------------------
@@ -884,6 +1816,10 @@ class FileWalker {
         if (serverBinding) {
           return [`binding from server module "${serverBinding}"`];
         }
+        const reExported = this.resolveLocalReExport(id.text, depth);
+        if (reExported.length > 0) {
+          return reExported;
+        }
         const nameReason = this.matchesAny(id.text, this.identifierRE);
         return nameReason ? [`identifier "${nameReason}" (sensitive name)`] : [];
       }
@@ -897,6 +1833,12 @@ class FileWalker {
         const tracked = this.analysis.taint.get(access.getText(this.analysis.sf));
         if (tracked) {
           return tracked.slice(0, 3);
+        }
+        if (ts.isIdentifier(base)) {
+          const namespaceReasons = this.resolveNamespaceMember(base.text, name);
+          if (namespaceReasons.length > 0) {
+            return namespaceReasons;
+          }
         }
         const baseReasons = this.taintReasonsWorker(base, depth + 1);
         if (baseReasons.length > 0) {

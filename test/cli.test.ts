@@ -11,6 +11,7 @@ const CLEAN = path.join(FIXTURES, "clean");
 const ALIASES = path.join(FIXTURES, "aliases");
 const ALIAS_CONFIG = path.join(FIXTURES, "alias-config");
 const MEMBER_JSX = path.join(FIXTURES, "member-jsx");
+const RE_EXPORT = path.join(FIXTURES, "re-export");
 const CLI = path.resolve(__dirname, "..", "..", "dist", "cli.js");
 
 test("runScan reports findings and exit code 1 for a leaking fixture", () => {
@@ -105,4 +106,32 @@ test("the built CLI emits valid JSON on stdout", () => {
     encoding: "utf8",
   });
   assert.deepEqual(JSON.parse(cleanOut), []);
+});
+
+test("runScan flags re-export traversal leaks", () => {
+  const result = runScan([RE_EXPORT, "--json"], process.cwd());
+  assert.equal(result.code, 1);
+  const exports = result.findings.filter(
+    (finding) => finding.ruleId === "rsc/server-only-export",
+  );
+  assert.ok(exports.length >= 6, JSON.stringify(result.findings, null, 2));
+  assert.ok(
+    exports.some((finding) => finding.file.includes("lib/barrel.ts")),
+    JSON.stringify(exports, null, 2),
+  );
+  assert.ok(
+    exports.some((finding) => finding.file.includes("lib/named.ts")),
+    JSON.stringify(exports, null, 2),
+  );
+  assert.ok(
+    exports.some((finding) => finding.file.includes("lib/ns.ts")),
+    JSON.stringify(exports, null, 2),
+  );
+  const boundary = result.findings.filter(
+    (finding) => finding.ruleId === "rsc/client-boundary-prop",
+  );
+  assert.ok(
+    boundary.some((finding) => finding.message.includes('prop "apiKey"')),
+    JSON.stringify(boundary, null, 2),
+  );
 });
