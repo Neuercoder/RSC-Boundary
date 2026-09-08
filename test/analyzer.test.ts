@@ -13,6 +13,7 @@ const MEMBER_JSX = path.join(FIXTURES, "member-jsx");
 const RE_EXPORT = path.join(FIXTURES, "re-export");
 const AWAIT_TAINT = path.join(FIXTURES, "await-taint");
 const ITERATION_TAINT = path.join(FIXTURES, "iteration-taint");
+const ASYNC_FLOW = path.join(FIXTURES, "async-flow");
 
 function analyze(dir: string, config = defaultConfig()) {
   const files = collectFiles(dir, config);
@@ -336,5 +337,35 @@ test("mutating collection calls merge argument taint into the receiver", () => {
   assert.ok(
     pushed.sources.some((source) => source.includes("process.env")),
     JSON.stringify(pushed.sources, null, 2),
+  );
+});
+
+test("tracks taint through await of a sensitive async call", () => {
+  const result = analyze(ASYNC_FLOW);
+  const boundary = byRule(result.findings, RULES.CLIENT_BOUNDARY_PROP);
+  const awaited = boundary.find((finding) => finding.message.includes('prop "title"'));
+  assert.ok(awaited, JSON.stringify(result.findings, null, 2));
+  assert.ok(
+    boundary.some((finding) => finding.sources.some((source) => source.includes("loadSessionRecord"))),
+    JSON.stringify(boundary, null, 2),
+  );
+});
+
+test("tracks taint through ||= and &&= compound assignments", () => {
+  const result = analyze(ASYNC_FLOW);
+  const boundary = byRule(result.findings, RULES.CLIENT_BOUNDARY_PROP);
+  assert.ok(boundary.length >= 3, JSON.stringify(result.findings, null, 2));
+  assert.ok(
+    boundary.some((finding) => finding.sources.some((source) => source.includes("compound-assigned fallback"))),
+    JSON.stringify(boundary, null, 2),
+  );
+  assert.ok(
+    boundary.some((finding) => finding.sources.some((source) => source.includes("compound-assigned record"))),
+    JSON.stringify(boundary, null, 2),
+  );
+  // The static-text prop stays silent.
+  assert.ok(
+    !boundary.some((finding) => finding.message.includes("static text")),
+    JSON.stringify(boundary, null, 2),
   );
 });

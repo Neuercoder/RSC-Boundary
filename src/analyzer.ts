@@ -1065,9 +1065,11 @@ class FileWalker {
       }
       return;
     }
-    if (token === ts.SyntaxKind.PlusEqualsToken) {
+    if (token === ts.SyntaxKind.PlusEqualsToken ||
+        token === ts.SyntaxKind.BarBarEqualsToken ||
+        token === ts.SyntaxKind.AmpersandAmpersandEqualsToken) {
       const lhs = node.left;
-      if ((ts.isIdentifier(lhs) || ts.isPropertyAccessExpression(lhs)) && this.isTainted(node.right)) {
+      if ((ts.isIdentifier(lhs) || ts.isPropertyAccessExpression(lhs) || ts.isElementAccessExpression(lhs)) && this.isTainted(node.right)) {
         this.addTaint(lhs.getText(this.analysis.sf), `compound-assigned ${this.describe(node.right)}`);
       }
       return;
@@ -2052,6 +2054,7 @@ class FileWalker {
         return this.taintReasonsWorker((node as ts.PostfixUnaryExpression).operand, depth + 1);
       }
       case ts.SyntaxKind.AsExpression:
+      case ts.SyntaxKind.SatisfiesExpression:
       case ts.SyntaxKind.TypeAssertionExpression:
       case ts.SyntaxKind.NonNullExpression: {
         const asserted = node as
@@ -2060,11 +2063,10 @@ class FileWalker {
           | ts.NonNullExpression;
         return this.taintReasonsWorker(asserted.expression, depth + 1);
       }
-      case ts.SyntaxKind.SatisfiesExpression: {
-        return this.taintReasonsWorker((node as ts.SatisfiesExpression).expression, depth + 1);
-      }
-      case ts.SyntaxKind.AwaitExpression: {
-        return this.taintReasonsWorker((node as ts.AwaitExpression).expression, depth + 1);
+      case ts.SyntaxKind.AwaitExpression:
+      case ts.SyntaxKind.YieldExpression: {
+        const inner = (node as ts.AwaitExpression | ts.YieldExpression).expression;
+        return inner ? this.taintReasonsWorker(inner, depth + 1) : [];
       }
       case ts.SyntaxKind.SpreadElement: {
         return this.taintReasonsWorker((node as ts.SpreadElement).expression, depth + 1);
