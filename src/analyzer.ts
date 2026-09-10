@@ -789,6 +789,13 @@ class FileWalker {
   /** Bind taint onto every variable name in a binding pattern / identifier. */
   private bindNames(name: ts.BindingName, reasons: string[]): void {
     if (ts.isIdentifier(name)) {
+      // NEXT_PUBLIC_* env vars are inlined into the client bundle by design,
+      // so names derived solely from the bare `process.env` base stay public
+      // (e.g. `const pub = process.env.NEXT_PUBLIC_X` must stay clean even
+      // when the name itself matches a sensitive-name pattern).
+      if (reasons.length > 0 && reasons.every((reason) => reason === "process.env")) {
+        return;
+      }
       for (const reason of reasons) {
         this.addTaint(name.text, reason);
       }
@@ -1080,6 +1087,9 @@ class FileWalker {
     if (ts.isIdentifier(base) && base.text === "process" && name === "env") {
       return; // process.env base is handled by taintReasons
     }
+    if (this.isNextPublicEnvRead(node)) {
+      return; // NEXT_PUBLIC_* reads are public by design, never tainted
+    }
     const baseReasons = this.taintReasons(base);
     if (baseReasons.length > 0) {
       this.addTaint(node.getText(this.analysis.sf), `read ${this.describe(node)}`);
@@ -1122,6 +1132,21 @@ class FileWalker {
     ) {
       this.addTaint(target.getText(this.analysis.sf), `iterates ${this.describe(node.expression)}`);
     }
+  }
+
+  private isNextPublicEnvRead(node: ts.PropertyAccessExpression): boolean {
+    // Matches process.env.NEXT_PUBLIC_X (directly or through parentheses).
+    let base: ts.Expression = node.expression;
+    while (ts.isParenthesizedExpression(base)) {
+      base = base.expression;
+    }
+    return (
+      ts.isPropertyAccessExpression(base) &&
+      ts.isIdentifier(base.expression) &&
+      base.expression.text === "process" &&
+      base.name.text === "env" &&
+      node.name.text.startsWith("NEXT_PUBLIC_")
+    );
   }
 
   private processCallLike(node: ts.CallExpression | ts.NewExpression | ts.TaggedTemplateExpression): void {
@@ -1932,6 +1957,11 @@ class FileWalker {
         const access = node as ts.PropertyAccessExpression;
         const base = access.expression;
         const name = access.name.text;
+        // NEXT_PUBLIC_* env vars are inlined into the client bundle by
+        // design, so they are safe to pass across RSC boundaries.
+        if (this.isNextPublicEnvRead(access)) {
+          return [];
+        }
         if (ts.isIdentifier(base) && base.text === "process") {
           return [name === "env" ? "process.env" : `process.env.${name}`];
         }
@@ -1957,6 +1987,18 @@ class FileWalker {
         const tracked = this.analysis.taint.get(access.getText(this.analysis.sf));
         if (tracked) {
           return tracked.slice(0, 3);
+        }
+        // process.env["NEXT_PUBLIC_X"] is public by design (see the
+        // PropertyAccessExpression case above).
+        if (
+          ts.isPropertyAccessExpression(access.expression) &&
+          ts.isIdentifier(access.expression.expression) &&
+          access.expression.expression.text === "process" &&
+          access.expression.name.text === "env" &&
+          ts.isStringLiteralLike(access.argumentExpression) &&
+          access.argumentExpression.text.startsWith("NEXT_PUBLIC_")
+        ) {
+          return [];
         }
         return this.taintReasonsWorker(access.expression, depth + 1);
       }
@@ -2047,6 +2089,11 @@ class FileWalker {
       case ts.SyntaxKind.ParenthesizedExpression: {
         return this.taintReasonsWorker((node as ts.ParenthesizedExpression).expression, depth + 1);
       }
+      case ts.SyntaxKind.AwaitExpression:
+      case ts.SyntaxKind.YieldExpression: {
+        const inner = node as ts.AwaitExpression | ts.YieldExpression;
+        return inner.expression ? this.taintReasonsWorker(inner.expression, depth + 1) : [];
+      }
       case ts.SyntaxKind.PostfixUnaryExpression:
       case ts.SyntaxKind.PrefixUnaryExpression: {
         return this.taintReasonsWorker((node as ts.PostfixUnaryExpression).operand, depth + 1);
@@ -2062,9 +2109,6 @@ class FileWalker {
       }
       case ts.SyntaxKind.SatisfiesExpression: {
         return this.taintReasonsWorker((node as ts.SatisfiesExpression).expression, depth + 1);
-      }
-      case ts.SyntaxKind.AwaitExpression: {
-        return this.taintReasonsWorker((node as ts.AwaitExpression).expression, depth + 1);
       }
       case ts.SyntaxKind.SpreadElement: {
         return this.taintReasonsWorker((node as ts.SpreadElement).expression, depth + 1);
