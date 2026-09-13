@@ -1954,6 +1954,12 @@ class FileWalker {
           | ts.NonNullExpression;
         return this.taintReasonsWorker(asserted.expression, depth + 1);
       }
+      case ts.SyntaxKind.SatisfiesExpression: {
+        return this.taintReasonsWorker((node as ts.SatisfiesExpression).expression, depth + 1);
+      }
+      case ts.SyntaxKind.AwaitExpression: {
+        return this.taintReasonsWorker((node as ts.AwaitExpression).expression, depth + 1);
+      }
       case ts.SyntaxKind.SpreadElement: {
         return this.taintReasonsWorker((node as ts.SpreadElement).expression, depth + 1);
       }
@@ -1967,6 +1973,14 @@ class FileWalker {
             }
           } else if (ts.isSpreadAssignment(prop)) {
             const reasons = this.taintReasonsWorker(prop.expression, depth + 1);
+            if (reasons.length > 0) {
+              return reasons.slice(0, 3);
+            }
+          } else if (ts.isShorthandPropertyAssignment(prop)) {
+            // `{ secret }` reads the binding `secret`; taint the whole
+            // literal when the binding is tainted so `{ secret }.secret`
+            // and spreads stay flagged.
+            const reasons = this.taintReasonsWorker(prop.name, depth + 1);
             if (reasons.length > 0) {
               return reasons.slice(0, 3);
             }

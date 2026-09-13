@@ -11,6 +11,7 @@ const CLEAN = path.join(FIXTURES, "clean");
 const ALIASES = path.join(FIXTURES, "aliases");
 const MEMBER_JSX = path.join(FIXTURES, "member-jsx");
 const RE_EXPORT = path.join(FIXTURES, "re-export");
+const AWAIT_TAINT = path.join(FIXTURES, "await-taint");
 
 function analyze(dir: string, config = defaultConfig()) {
   const files = collectFiles(dir, config);
@@ -255,4 +256,34 @@ test("importers of barrels inherit taint, incl. client components via barrels", 
 test("re-export cycles do not hang the analyzer", () => {
   const result = analyze(RE_EXPORT);
   assert.ok(result.findings.length > 0);
+});
+
+test("await unwraps server-call taint into client-boundary props", () => {
+  const result = analyze(AWAIT_TAINT);
+  const boundary = byRule(result.findings, RULES.CLIENT_BOUNDARY_PROP);
+  assert.equal(boundary.length, 3, JSON.stringify(boundary, null, 2));
+  // `value`, `checked`, and `box` are neutral names: only passthrough can flag them.
+  const awaited = boundary.find((finding) => finding.line === 12);
+  assert.ok(awaited, JSON.stringify(boundary, null, 2));
+  assert.ok(
+    awaited.sources.some((source) => source.includes("loadValue")),
+    JSON.stringify(awaited.sources, null, 2),
+  );
+});
+
+test("satisfies and shorthand objects are transparent to taint", () => {
+  const result = analyze(AWAIT_TAINT);
+  const boundary = byRule(result.findings, RULES.CLIENT_BOUNDARY_PROP);
+  const satisfied = boundary.find((finding) => finding.line === 11);
+  assert.ok(satisfied, JSON.stringify(boundary, null, 2));
+  assert.ok(
+    satisfied.sources.some((source) => source.includes("process.env")),
+    JSON.stringify(satisfied.sources, null, 2),
+  );
+  const shorthand = boundary.find((finding) => finding.line === 13);
+  assert.ok(shorthand, JSON.stringify(boundary, null, 2));
+  assert.ok(
+    shorthand.sources.some((source) => source.includes("box.value")),
+    JSON.stringify(shorthand.sources, null, 2),
+  );
 });

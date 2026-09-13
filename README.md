@@ -64,6 +64,7 @@ CI (`.github/workflows/ci.yml`) runs install, build, test, and lint.
 - Import path-alias resolution (`@/*`): [docs/specs/path-alias-resolution.md](docs/specs/path-alias-resolution.md)
 - Member JSX components (`<Foo.Bar>`): [docs/specs/member-jsx-components.md](docs/specs/member-jsx-components.md)
 - Re-export traversal (barrel files): [docs/specs/re-export-traversal.md](docs/specs/re-export-traversal.md)
+- Await / satisfies / shorthand passthrough: [docs/specs/await-satisfies-shorthand.md](docs/specs/await-satisfies-shorthand.md)
 - Milestone tracker: [docs/milestones/](docs/milestones/)
 
 ## Current status
@@ -74,6 +75,8 @@ tsconfig-style import aliases, default `"@/*": ["./*"]`), and **2026-09-06 —
 Member JSX Components** (compound tags like `<Card.Header>` and
 `<Panel.Item>` are now treated as client-component boundaries), and
 **2026-09-07 — Re-export Traversal** (barrel `export *` / `export { x }
-from` / `export * as ns` chains resolve across files, cycle-safe). Known
+from` / `export * as ns` chains resolve across files, cycle-safe), and
+**2026-09-13 — Await / Satisfies / Shorthand Passthrough** (`await`,
+`satisfies`, and `{ shorthand }` objects are transparent to taint). Known
 limitation (see spec §11): cross-module type-aware
 dataflow is not yet covered.
