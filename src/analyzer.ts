@@ -873,6 +873,8 @@ class FileWalker {
       this.processBinaryExpression(node);
     } else if (ts.isPropertyAccessExpression(node)) {
       this.processPropertyAccess(node);
+    } else if (ts.isForOfStatement(node) || ts.isForInStatement(node)) {
+      this.processForIteration(node);
     } else if (ts.isCallExpression(node) || ts.isNewExpression(node) || ts.isTaggedTemplateExpression(node)) {
       this.processCallLike(node);
     } else if (ts.isExportDeclaration(node) || ts.isExportAssignment(node)) {
@@ -1088,9 +1090,52 @@ class FileWalker {
     }
   }
 
+  /**
+   * Bind loop variables from the iterated expression (`for (const row of
+   * rows)`, `for (const k in cfg)`): when the iterated expression is tainted
+   * the loop variable reads that tainted sequence, so it inherits the
+   * provenance. Destructured loop targets (`for (const { password } of
+   * users)`) reuse the binding-element path so sensitive members are caught
+   * even when the iterated sequence is unknown.
+   */
+  private processForIteration(node: ts.ForOfStatement | ts.ForInStatement): void {
+    const reasons = this.taintReasons(node.expression);
+    if (ts.isVariableDeclarationList(node.initializer)) {
+      for (const decl of node.initializer.declarations) {
+        // Always bind through the binding-element path: with a tainted
+        // sequence the loop variable inherits its provenance, and with an
+        // unknown sequence destructured sensitive members (`{ password }`)
+        // still taint via the sensitive-member check inside `bindNames`.
+        this.bindNames(decl.name, reasons);
+      }
+      return;
+    }
+    if (reasons.length === 0) {
+      return;
+    }
+    const target = node.initializer;
+    if (ts.isIdentifier(target)) {
+      this.addTaint(target.text, `iterates ${this.describe(node.expression)}`);
+    } else if (
+      ts.isPropertyAccessExpression(target) ||
+      ts.isElementAccessExpression(target)
+    ) {
+      this.addTaint(target.getText(this.analysis.sf), `iterates ${this.describe(node.expression)}`);
+    }
+  }
+
   private processCallLike(node: ts.CallExpression | ts.NewExpression | ts.TaggedTemplateExpression): void {
     if (ts.isCallExpression(node)) {
       this.checkExternalSink(node);
+      // Bind `rows.map((row) => …)` element parameters during the walk so
+      // callbacks nested inside intrinsic parents (`<main>{rows.map(…)}</main>`)
+      // — which `processJsx` never evaluates as an expression — still taint
+      // their element parameter before the callback body is walked.
+      this.bindCallbackParameters(node);
+      // Mutating array/set/map methods (`vals.push(secret)`) merge the
+      // argument into the receiver: taint the receiver when an argument is
+      // tainted so later reads (`vals[0]`, `vals.map(…)`) stay flagged.
+      this.taintMutationReceiver(node);
     }
     // Taint the callee identifier so later calls reuse the reasoning.
     if (ts.isCallExpression(node) && ts.isIdentifier(node.expression)) {
@@ -1365,6 +1410,66 @@ class FileWalker {
       }
     }
     return false;
+  }
+
+  /**
+   * Bind callback parameters from the receiver's taint (`rows.map((row) =>
+   * …)`): when the object a method is called on is tainted, the callback's
+   * first parameter reads that tainted sequence, so it inherits the
+   * provenance. Only the first parameter is bound (element type); index/array
+   * parameters stay clean. Destructured parameters reuse the binding-element
+   * path so sensitive members are caught.
+   */
+  private bindCallbackParameters(call: ts.CallExpression | ts.NewExpression): void {
+    if (!ts.isCallExpression(call) || !ts.isPropertyAccessExpression(call.expression)) {
+      return;
+    }
+    if (call.arguments.length === 0) {
+      return;
+    }
+    const callback = call.arguments[call.arguments.length - 1];
+    if (!ts.isArrowFunction(callback) && !ts.isFunctionExpression(callback)) {
+      return;
+    }
+    if (callback.parameters.length === 0) {
+      return;
+    }
+    const receiverReasons = this.taintReasonsWorker(call.expression.expression, 0);
+    if (receiverReasons.length === 0) {
+      return;
+    }
+    this.bindNames(callback.parameters[0].name, receiverReasons);
+  }
+
+  /**
+   * Taint the receiver of mutating collection calls (`vals.push(secret)`,
+   * `vals.unshift(secret)`, `set.add(secret)`, `map.set(k, secret)`): the
+   * argument flows into the receiver, so later reads of the receiver inherit
+   * its provenance. Read-only transformers (`map`, `filter`, `concat`) are
+   * intentionally excluded — their result is handled at the call site.
+   */
+  private taintMutationReceiver(call: ts.CallExpression): void {
+    if (!ts.isPropertyAccessExpression(call.expression)) {
+      return;
+    }
+    const method = call.expression.name.text;
+    if (!/^(push|unshift|add|set|append|insert)$/.test(method)) {
+      return;
+    }
+    for (const arg of call.arguments) {
+      const reasons = this.taintReasons(arg);
+      if (reasons.length > 0) {
+        const receiver = call.expression.expression;
+        if (ts.isIdentifier(receiver)) {
+          for (const reason of reasons) {
+            this.addTaint(receiver.text, reason);
+          }
+        } else {
+          this.addTaint(receiver.getText(this.analysis.sf), reasons[0]);
+        }
+        return;
+      }
+    }
   }
 
   private taintReasonsFor(target: FileAnalysis, name: string): string[] {
@@ -1858,6 +1963,7 @@ class FileWalker {
       case ts.SyntaxKind.CallExpression:
       case ts.SyntaxKind.NewExpression: {
         const call = node as ts.CallExpression | ts.NewExpression;
+        this.bindCallbackParameters(call);
         for (const arg of call.arguments ?? []) {
           const argReasons = this.taintReasonsWorker(arg, depth + 1);
           if (argReasons.length > 0) {
