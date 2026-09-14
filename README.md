@@ -66,6 +66,7 @@ CI (`.github/workflows/ci.yml`) runs install, build, test, and lint.
 - Re-export traversal (barrel files): [docs/specs/re-export-traversal.md](docs/specs/re-export-traversal.md)
 - Await / satisfies / shorthand passthrough: [docs/specs/await-satisfies-shorthand.md](docs/specs/await-satisfies-shorthand.md)
 - Iteration / collection taint (`for...of`, `.map` callbacks, `.push` mutation): [docs/specs/iteration-collection-taint.md](docs/specs/iteration-collection-taint.md)
+- Async/await taint propagation: [docs/specs/async-await-taint-propagation.md](docs/specs/async-await-taint-propagation.md)
 - Milestone tracker: [docs/milestones/](docs/milestones/)
 
 ## Current status
@@ -76,11 +77,13 @@ tsconfig-style import aliases, default `"@/*": ["./*"]`), and **2026-09-06 —
 Member JSX Components** (compound tags like `<Card.Header>` and
 `<Panel.Item>` are now treated as client-component boundaries), and
 **2026-09-07 — Re-export Traversal** (barrel `export *` / `export { x }
-from` / `export * as ns` chains resolve across files, cycle-safe), and
-**2026-09-13 — Await / Satisfies / Shorthand Passthrough** (`await`,
-`satisfies`, and `{ shorthand }` objects are transparent to taint), and
-**2026-09-14 — Iteration / Collection Taint** (`for...of` / `for...in`
-loop variables, `.map`-style callback element parameters, and
+from` / `export * as ns` chains resolve across files, cycle-safe),
+**2026-09-09 — Async/Await Taint Propagation** (`await`/`yield` unwrap
+transparently, so async Server Component flows flag like their synchronous
+equivalents), **2026-09-13 — Await / Satisfies / Shorthand Passthrough**
+(`await`, `satisfies`, and `{ shorthand }` objects are transparent to
+taint), and **2026-09-14 — Iteration / Collection Taint** (`for...of` /
+`for...in` loop variables, `.map`-style callback element parameters, and
 `.push`-style mutating calls propagate taint). Known
 limitation (see spec §11): cross-module type-aware
 dataflow is not yet covered.
