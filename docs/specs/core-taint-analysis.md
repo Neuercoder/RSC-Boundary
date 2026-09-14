@@ -162,7 +162,10 @@ model (`loadConfig`, `defaultConfig`, `mergeConfig`).
   chains) is supported — see [re-export-traversal.md](re-export-traversal.md)
   — `await` / `satisfies` / shorthand-object passthroughs are supported —
   see [await-satisfies-shorthand.md](await-satisfies-shorthand.md) — and so
-  are loop iteration (`for...of` / `for...in`), collection-callback element
+  are awaited taint passthrough (`await getUser(1)`) and public
+  `NEXT_PUBLIC_*` env reads — see
+  [awaited-taint-public-env.md](awaited-taint-public-env.md) — and so are
+  loop iteration (`for...of` / `for...in`), collection-callback element
   parameters (`rows.map((entry) => …)`), and mutating collection calls
   (`bucket.push(secret)`) — see
   [iteration-collection-taint.md](iteration-collection-taint.md).

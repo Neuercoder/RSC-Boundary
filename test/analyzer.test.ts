@@ -13,6 +13,7 @@ const MEMBER_JSX = path.join(FIXTURES, "member-jsx");
 const RE_EXPORT = path.join(FIXTURES, "re-export");
 const AWAIT_TAINT = path.join(FIXTURES, "await-taint");
 const ITERATION_TAINT = path.join(FIXTURES, "iteration-taint");
+const ASYNC_PUBLIC = path.join(FIXTURES, "async-public");
 
 function analyze(dir: string, config = defaultConfig()) {
   const files = collectFiles(dir, config);
@@ -337,4 +338,37 @@ test("mutating collection calls merge argument taint into the receiver", () => {
     pushed.sources.some((source) => source.includes("process.env")),
     JSON.stringify(pushed.sources, null, 2),
   );
+});
+
+test("taint flows through await of server data and awaited secrets", () => {
+  const result = analyze(ASYNC_PUBLIC);
+  const boundary = byRule(result.findings, RULES.CLIENT_BOUNDARY_PROP);
+  assert.ok(boundary.length >= 2, JSON.stringify(result.findings, null, 2));
+  // `await getUser(1)`: the server-module call result survives `await`.
+  assert.ok(
+    boundary.some(
+      (finding) =>
+        finding.line === 13 && finding.sources.some((source) => source.includes("server module")),
+    ),
+    JSON.stringify(boundary, null, 2),
+  );
+  // `await Promise.resolve(process.env.SECRET_KEY)`.
+  assert.ok(
+    boundary.some(
+      (finding) =>
+        finding.line === 14 && finding.sources.some((source) => source.includes("process.env")),
+    ),
+    JSON.stringify(boundary, null, 2),
+  );
+});
+
+test("NEXT_PUBLIC_* env reads are public and stay silent at client boundaries", () => {
+  const result = analyze(ASYNC_PUBLIC);
+  const boundary = byRule(result.findings, RULES.CLIENT_BOUNDARY_PROP);
+  assert.ok(
+    !boundary.some((finding) => finding.sources.some((source) => source.includes("NEXT_PUBLIC"))),
+    JSON.stringify(boundary, null, 2),
+  );
+  // Static props stay silent too.
+  assert.ok(!boundary.some((finding) => finding.message.includes("static text")));
 });
