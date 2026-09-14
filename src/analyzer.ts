@@ -2066,6 +2066,10 @@ class FileWalker {
       case ts.SyntaxKind.AwaitExpression: {
         return this.taintReasonsWorker((node as ts.AwaitExpression).expression, depth + 1);
       }
+      case ts.SyntaxKind.YieldExpression: {
+        const yielded = (node as ts.YieldExpression).expression;
+        return yielded ? this.taintReasonsWorker(yielded, depth + 1) : [];
+      }
       case ts.SyntaxKind.SpreadElement: {
         return this.taintReasonsWorker((node as ts.SpreadElement).expression, depth + 1);
       }

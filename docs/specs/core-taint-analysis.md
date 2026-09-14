@@ -60,6 +60,10 @@ Taint flows through (conservative, per-file, fixpoint over ≤ 6 passes):
 - Default parameter / binding initializers: `function f(token = process.env.T)`.
 - Object/array literals, spread, template literals, `+`, `??`, `&&`, `||`,
   ternaries, parentheses, type assertions, unary expressions.
+- `await` / `satisfies` / shorthand objects are transparent to taint (see
+  [await-satisfies-shorthand.md](await-satisfies-shorthand.md)); generator
+  `yield` unwraps to its operand (see
+  [await-expression-propagation.md](await-expression-propagation.md)).
 - Property/element reads on tainted bases (`obj.key`, `arr[0]`).
 - Calls: result is tainted when the callee is tainted (e.g. a server-module
   binding like `getUser(...)`), when any argument is tainted, or when the
@@ -161,10 +165,12 @@ model (`loadConfig`, `defaultConfig`, `mergeConfig`).
   (`export * from`, `export { x } from`, `export * as ns from` barrel
   chains) is supported — see [re-export-traversal.md](re-export-traversal.md)
   — `await` / `satisfies` / shorthand-object passthroughs are supported —
-  see [await-satisfies-shorthand.md](await-satisfies-shorthand.md) — and so
-  are loop iteration (`for...of` / `for...in`), collection-callback element
-  parameters (`rows.map((entry) => …)`), and mutating collection calls
-  (`bucket.push(secret)`) — see
+  see [await-satisfies-shorthand.md](await-satisfies-shorthand.md) — plus
+  generator `yield` unwrapping — see
+  [await-expression-propagation.md](await-expression-propagation.md) — and
+  so are loop iteration (`for...of` / `for...in`), collection-callback
+  element parameters (`rows.map((entry) => …)`), and mutating collection
+  calls (`bucket.push(secret)`) — see
   [iteration-collection-taint.md](iteration-collection-taint.md).
 - Data sources are matched by name/call patterns, not by full type-aware
   dataflow across modules; false positives are expected and suppressible.
