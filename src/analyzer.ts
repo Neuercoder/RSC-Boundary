@@ -2047,6 +2047,16 @@ class FileWalker {
       case ts.SyntaxKind.ParenthesizedExpression: {
         return this.taintReasonsWorker((node as ts.ParenthesizedExpression).expression, depth + 1);
       }
+      // `await`/`yield` unwrap a deferred value without sanitizing it: an
+      // awaited tainted call (the common async Server Component pattern)
+      // taints the receiving binding exactly like its synchronous form.
+      case ts.SyntaxKind.AwaitExpression: {
+        return this.taintReasonsWorker((node as ts.AwaitExpression).expression, depth + 1);
+      }
+      case ts.SyntaxKind.YieldExpression: {
+        const yielded = (node as ts.YieldExpression).expression;
+        return yielded ? this.taintReasonsWorker(yielded, depth + 1) : [];
+      }
       case ts.SyntaxKind.PostfixUnaryExpression:
       case ts.SyntaxKind.PrefixUnaryExpression: {
         return this.taintReasonsWorker((node as ts.PostfixUnaryExpression).operand, depth + 1);
@@ -2062,9 +2072,6 @@ class FileWalker {
       }
       case ts.SyntaxKind.SatisfiesExpression: {
         return this.taintReasonsWorker((node as ts.SatisfiesExpression).expression, depth + 1);
-      }
-      case ts.SyntaxKind.AwaitExpression: {
-        return this.taintReasonsWorker((node as ts.AwaitExpression).expression, depth + 1);
       }
       case ts.SyntaxKind.SpreadElement: {
         return this.taintReasonsWorker((node as ts.SpreadElement).expression, depth + 1);

@@ -13,6 +13,7 @@ const MEMBER_JSX = path.join(FIXTURES, "member-jsx");
 const RE_EXPORT = path.join(FIXTURES, "re-export");
 const AWAIT_TAINT = path.join(FIXTURES, "await-taint");
 const ITERATION_TAINT = path.join(FIXTURES, "iteration-taint");
+const ASYNC_AWAIT = path.join(FIXTURES, "async-await");
 
 function analyze(dir: string, config = defaultConfig()) {
   const files = collectFiles(dir, config);
@@ -336,5 +337,29 @@ test("mutating collection calls merge argument taint into the receiver", () => {
   assert.ok(
     pushed.sources.some((source) => source.includes("process.env")),
     JSON.stringify(pushed.sources, null, 2),
+  );
+});
+
+test("awaited tainted calls propagate taint into client-component props", () => {
+  const result = analyze(ASYNC_AWAIT);
+  const boundary = byRule(result.findings, RULES.CLIENT_BOUNDARY_PROP);
+  // `record` matches no sensitive-identifier pattern; this finding must come
+  // from taint flowing through `await fetchSessionData(...)`.
+  assert.ok(
+    boundary.some((finding) => finding.message.includes('prop "title"')),
+    JSON.stringify(boundary, null, 2),
+  );
+});
+
+test("async function chains returning awaited taint are flagged as exporters", () => {
+  const result = analyze(ASYNC_AWAIT);
+  const exports = byRule(result.findings, RULES.SERVER_ONLY_EXPORT);
+  assert.ok(
+    exports.some(
+      (finding) =>
+        finding.file.endsWith("lib/session-store.ts") &&
+        finding.message.includes('"fetchSessionData"'),
+    ),
+    JSON.stringify(exports, null, 2),
   );
 });
