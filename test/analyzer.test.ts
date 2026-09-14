@@ -13,6 +13,7 @@ const MEMBER_JSX = path.join(FIXTURES, "member-jsx");
 const RE_EXPORT = path.join(FIXTURES, "re-export");
 const AWAIT_TAINT = path.join(FIXTURES, "await-taint");
 const ITERATION_TAINT = path.join(FIXTURES, "iteration-taint");
+const SERVER_ACTIONS = path.join(FIXTURES, "server-actions");
 
 function analyze(dir: string, config = defaultConfig()) {
   const files = collectFiles(dir, config);
@@ -336,5 +337,47 @@ test("mutating collection calls merge argument taint into the receiver", () => {
   assert.ok(
     pushed.sources.some((source) => source.includes("process.env")),
     JSON.stringify(pushed.sources, null, 2),
+  );
+});
+
+test("flags server-action modules exporting sensitive values", () => {
+  const result = analyze(SERVER_ACTIONS);
+  const exports = byRule(result.findings, RULES.SERVER_ONLY_EXPORT);
+  assert.ok(
+    exports.some(
+      (finding) => finding.file.endsWith("lib/actions.ts") && finding.message.includes('"ADMIN_TOKEN"'),
+    ),
+    JSON.stringify(exports, null, 2),
+  );
+  assert.ok(
+    exports.some(
+      (finding) => finding.file.endsWith("lib/actions.ts") && finding.message.includes('"deleteAccount"'),
+    ),
+    JSON.stringify(exports, null, 2),
+  );
+  // A clean action in the same module stays silent.
+  assert.ok(
+    !exports.some((finding) => finding.message.includes('"getPublicProfile"')),
+    JSON.stringify(exports, null, 2),
+  );
+});
+
+test("flags inline use-server functions and taints their callers", () => {
+  const result = analyze(SERVER_ACTIONS);
+  const exports = byRule(result.findings, RULES.SERVER_ONLY_EXPORT);
+  assert.ok(
+    exports.some(
+      (finding) => finding.file.endsWith("lib/inline.ts") && finding.message.includes('"updateEmail"'),
+    ),
+    JSON.stringify(exports, null, 2),
+  );
+  assert.ok(
+    !exports.some((finding) => finding.message.includes('"ping"')),
+    JSON.stringify(exports, null, 2),
+  );
+  const boundary = byRule(result.findings, RULES.CLIENT_BOUNDARY_PROP);
+  assert.ok(
+    boundary.some((finding) => finding.message.includes('prop "title"')),
+    JSON.stringify(boundary, null, 2),
   );
 });

@@ -165,7 +165,9 @@ model (`loadConfig`, `defaultConfig`, `mergeConfig`).
   are loop iteration (`for...of` / `for...in`), collection-callback element
   parameters (`rows.map((entry) => …)`), and mutating collection calls
   (`bucket.push(secret)`) — see
-  [iteration-collection-taint.md](iteration-collection-taint.md).
+  [iteration-collection-taint.md](iteration-collection-taint.md)
+  — and Server Actions (`"use server"` modules and inline functions) count
+  as server-side exporters — see [server-actions.md](server-actions.md).
 - Data sources are matched by name/call patterns, not by full type-aware
   dataflow across modules; false positives are expected and suppressible.
 - No serializers/DTO suggestions, no fix/auto-rewrite, no Next.js API-route or

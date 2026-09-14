@@ -62,6 +62,10 @@ interface FileAnalysis {
   file: string;
   sf: ts.SourceFile;
   isClient: boolean;
+  /** Whether the file has a file-level `"use server"` directive (Server Actions module). */
+  isServerAction: boolean;
+  /** Names of functions with an inline `"use server"` directive that return tainted data. */
+  serverActionNames: Set<string>;
   /** Why this file counts as a server module, if it does. */
   serverReason: string | null;
   /** Import binding name -> server-module specifier it was imported from. */
@@ -130,6 +134,20 @@ function hasClientDirective(sf: ts.SourceFile): boolean {
     }
   }
   return /^\s*["']use client["']\s*;?\s*(?:\/\/.*)?$/m.test(sf.text);
+}
+
+function hasServerDirective(sf: ts.SourceFile): boolean {
+  const first = sf.statements[0];
+  if (first && ts.isExpressionStatement(first)) {
+    const expr = first.expression;
+    if (ts.isStringLiteral(expr) && expr.text === "use server") {
+      return true;
+    }
+    if (ts.isNoSubstitutionTemplateLiteral(expr) && expr.text.trim() === "use server") {
+      return true;
+    }
+  }
+  return /^\s*["']use server["']\s*;?\s*(?:\/\/.*)?$/m.test(sf.text);
 }
 
 function tryParse(file: string): ts.SourceFile | null {
@@ -233,6 +251,7 @@ export function analyzeFiles(files: string[], options: AnalyzeOptions = {}): Ana
       continue;
     }
     const isClient = hasClientDirective(sf);
+    const isServerAction = !isClient && hasServerDirective(sf);
     if (isClient) {
       clientFiles.add(file);
     }
@@ -240,6 +259,8 @@ export function analyzeFiles(files: string[], options: AnalyzeOptions = {}): Ana
       file,
       sf,
       isClient,
+      isServerAction,
+      serverActionNames: new Set(),
       serverReason: null,
       serverBindings: new Map(),
       elementToFile: new Map(),
@@ -903,6 +924,9 @@ class FileWalker {
     if (isServer || specifier === "next/headers" || specifier === "next/cookies") {
       this.markServerModule(`import "${specifier}"`);
     }
+    if (this.analysis.isServerAction) {
+      this.markServerModule(`"use server" directive`);
+    }
     if (this.analysis.isClient && isServer) {
       this.emit(
         node,
@@ -980,6 +1004,9 @@ class FileWalker {
     // Function assigned to a variable: taint the binding if the body returns
     // tainted data, so downstream call sites and exports are caught.
     if (ts.isArrowFunction(init) || ts.isFunctionExpression(init)) {
+      if (ts.isIdentifier(node.name) && this.hasInlineServerDirective(init)) {
+        this.analysis.serverActionNames.add(node.name.text);
+      }
       const reasons = this.functionReturnsTainted(init);
       if (reasons && ts.isIdentifier(node.name)) {
         this.addTaint(node.name.text, `returns ${reasons[0]}`);
@@ -996,10 +1023,30 @@ class FileWalker {
     if (!ts.isFunctionDeclaration(node) || !node.name) {
       return;
     }
+    if (this.hasInlineServerDirective(node)) {
+      this.analysis.serverActionNames.add(node.name.text);
+    }
     const reasons = this.functionReturnsTainted(node);
     if (reasons) {
       this.addTaint(node.name.text, `returns ${reasons[0]}`);
     }
+  }
+
+  /** Whether a function body starts with an inline `"use server"` directive. */
+  private hasInlineServerDirective(fn: ts.FunctionLikeDeclaration): boolean {
+    const body = fn.body;
+    if (!body || !ts.isBlock(body) || body.statements.length === 0) {
+      return false;
+    }
+    const first = body.statements[0];
+    if (!ts.isExpressionStatement(first)) {
+      return false;
+    }
+    const expr = first.expression;
+    return (
+      (ts.isStringLiteral(expr) && expr.text === "use server") ||
+      (ts.isNoSubstitutionTemplateLiteral(expr) && expr.text.trim() === "use server")
+    );
   }
 
   /** First tainted return expression found in `fn`'s body (skipping nested functions). */
@@ -1175,7 +1222,14 @@ class FileWalker {
   }
 
   private checkExportedDeclarations(node: ts.VariableStatement | ts.FunctionDeclaration | ts.ClassDeclaration): void {
-    if (!this.isExportedDeclaration(node) || !this.analysis.serverReason) {
+    const isServerActionExport =
+      (ts.isFunctionDeclaration(node) && !!node.name && this.analysis.serverActionNames.has(node.name.text)) ||
+      (ts.isVariableStatement(node) &&
+        node.declarationList.declarations.some(
+          (decl) => ts.isIdentifier(decl.name) && this.analysis.serverActionNames.has(decl.name.text),
+        )) ||
+      this.analysis.isServerAction;
+    if (!this.isExportedDeclaration(node) || !(this.analysis.serverReason || isServerActionExport)) {
       return;
     }
     const checkName = (name: ts.Identifier): void => {
@@ -1203,7 +1257,10 @@ class FileWalker {
 
   private processExport(node: ts.ExportDeclaration | ts.ExportAssignment): void {
     this.indexReExport(node);
-    if (!this.analysis.serverReason) {
+    const isServerActionExport =
+      this.analysis.isServerAction ||
+      this.analysis.serverActionNames.size > 0;
+    if (!this.analysis.serverReason && !isServerActionExport) {
       return;
     }
     if (ts.isExportAssignment(node)) {
