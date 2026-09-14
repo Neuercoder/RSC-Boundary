@@ -160,8 +160,12 @@ model (`loadConfig`, `defaultConfig`, `mergeConfig`).
   [member-jsx-components.md](member-jsx-components.md) — re-export traversal
   (`export * from`, `export { x } from`, `export * as ns from` barrel
   chains) is supported — see [re-export-traversal.md](re-export-traversal.md)
-  — and so are `await` / `satisfies` / shorthand-object passthroughs — see
-  [await-satisfies-shorthand.md](await-satisfies-shorthand.md).
+  — `await` / `satisfies` / shorthand-object passthroughs are supported —
+  see [await-satisfies-shorthand.md](await-satisfies-shorthand.md) — and so
+  are loop iteration (`for...of` / `for...in`), collection-callback element
+  parameters (`rows.map((entry) => …)`), and mutating collection calls
+  (`bucket.push(secret)`) — see
+  [iteration-collection-taint.md](iteration-collection-taint.md).
 - Data sources are matched by name/call patterns, not by full type-aware
   dataflow across modules; false positives are expected and suppressible.
 - No serializers/DTO suggestions, no fix/auto-rewrite, no Next.js API-route or

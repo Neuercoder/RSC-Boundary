@@ -12,6 +12,7 @@ const ALIASES = path.join(FIXTURES, "aliases");
 const MEMBER_JSX = path.join(FIXTURES, "member-jsx");
 const RE_EXPORT = path.join(FIXTURES, "re-export");
 const AWAIT_TAINT = path.join(FIXTURES, "await-taint");
+const ITERATION_TAINT = path.join(FIXTURES, "iteration-taint");
 
 function analyze(dir: string, config = defaultConfig()) {
   const files = collectFiles(dir, config);
@@ -285,5 +286,55 @@ test("satisfies and shorthand objects are transparent to taint", () => {
   assert.ok(
     shorthand.sources.some((source) => source.includes("box.value")),
     JSON.stringify(shorthand.sources, null, 2),
+  );
+});
+
+test("collection callbacks inherit receiver taint (rows.map)", () => {
+  const config = defaultConfig();
+  config.sensitiveIdentifiers = [];
+  config.sensitiveMembers = [];
+  const result = analyze(ITERATION_TAINT, config);
+  const boundary = byRule(result.findings, RULES.CLIENT_BOUNDARY_PROP);
+  // `rows`, `entry`, `labels` are neutral names: only receiver-to-parameter
+  // binding can flag `labels[0]`.
+  const mapped = boundary.find((finding) => finding.line === 20);
+  assert.ok(mapped, JSON.stringify(boundary, null, 2));
+  assert.ok(
+    mapped.sources.some((source) => source.includes("rows.map")),
+    JSON.stringify(mapped.sources, null, 2),
+  );
+});
+
+test("for-of and for-in loops propagate iterated taint", () => {
+  const config = defaultConfig();
+  config.sensitiveIdentifiers = [];
+  config.sensitiveMembers = [];
+  const result = analyze(ITERATION_TAINT, config);
+  const boundary = byRule(result.findings, RULES.CLIENT_BOUNDARY_PROP);
+  // `for (const item of rows)` -> `current`; neutral names throughout.
+  const forOf = boundary.find((finding) => finding.line === 21);
+  assert.ok(forOf, JSON.stringify(boundary, null, 2));
+  assert.ok(
+    forOf.sources.some((source) => source.includes("item")),
+    JSON.stringify(forOf.sources, null, 2),
+  );
+  // `for (const field in cfg)` -> `active`.
+  const forIn = boundary.find((finding) => finding.line === 22);
+  assert.ok(forIn, JSON.stringify(boundary, null, 2));
+  assert.ok(
+    forIn.sources.some((source) => source.includes("field")),
+    JSON.stringify(forIn.sources, null, 2),
+  );
+});
+
+test("mutating collection calls merge argument taint into the receiver", () => {
+  const result = analyze(ITERATION_TAINT);
+  const boundary = byRule(result.findings, RULES.CLIENT_BOUNDARY_PROP);
+  // `bucket.push(process.env.API_SECRET)` taints `bucket`, so `bucket[0]` flags.
+  const pushed = boundary.find((finding) => finding.line === 23);
+  assert.ok(pushed, JSON.stringify(boundary, null, 2));
+  assert.ok(
+    pushed.sources.some((source) => source.includes("process.env")),
+    JSON.stringify(pushed.sources, null, 2),
   );
 });
