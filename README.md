@@ -66,6 +66,7 @@ CI (`.github/workflows/ci.yml`) runs install, build, test, and lint.
 - Re-export traversal (barrel files): [docs/specs/re-export-traversal.md](docs/specs/re-export-traversal.md)
 - Await / satisfies / shorthand passthrough: [docs/specs/await-satisfies-shorthand.md](docs/specs/await-satisfies-shorthand.md)
 - Iteration / collection taint (`for...of`, `.map` callbacks, `.push` mutation): [docs/specs/iteration-collection-taint.md](docs/specs/iteration-collection-taint.md)
+- Element-access (bracket) reads (`user["password"]`, `` vault[`password`] ``): [docs/specs/element-access-taint.md](docs/specs/element-access-taint.md)
 - Milestone tracker: [docs/milestones/](docs/milestones/)
 
 ## Current status
@@ -81,6 +82,9 @@ from` / `export * as ns` chains resolve across files, cycle-safe), and
 `satisfies`, and `{ shorthand }` objects are transparent to taint), and
 **2026-09-14 — Iteration / Collection Taint** (`for...of` / `for...in`
 loop variables, `.map`-style callback element parameters, and
-`.push`-style mutating calls propagate taint). Known
+`.push`-style mutating calls propagate taint), and
+**2026-09-15 — Element-Access (Bracket) Taint** (static-key
+`user["password"]` / `` vault[`password`] `` reads propagate taint
+like dot access). Known
 limitation (see spec §11): cross-module type-aware
 dataflow is not yet covered.
