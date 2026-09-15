@@ -14,6 +14,7 @@ const MEMBER_JSX = path.join(FIXTURES, "member-jsx");
 const RE_EXPORT = path.join(FIXTURES, "re-export");
 const AWAIT_TAINT = path.join(FIXTURES, "await-taint");
 const ITERATION_TAINT = path.join(FIXTURES, "iteration-taint");
+const ELEMENT_TAINT = path.join(FIXTURES, "element-access-taint");
 const CLI = path.resolve(__dirname, "..", "..", "dist", "cli.js");
 
 test("runScan reports findings and exit code 1 for a leaking fixture", () => {
@@ -154,4 +155,13 @@ test("runScan flags iteration/collection leaks end to end", () => {
     (finding) => finding.ruleId === "rsc/client-boundary-prop",
   );
   assert.equal(boundary.length, 4, JSON.stringify(result.findings, null, 2));
+});
+
+test("runScan flags element-access leaks end to end", () => {
+  const result = runScan([ELEMENT_TAINT, "--json"], process.cwd());
+  assert.equal(result.code, 1);
+  const boundary = result.findings.filter(
+    (finding) => finding.ruleId === "rsc/client-boundary-prop",
+  );
+  assert.equal(boundary.length, 6, JSON.stringify(result.findings, null, 2));
 });

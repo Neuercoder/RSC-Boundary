@@ -13,6 +13,7 @@ const MEMBER_JSX = path.join(FIXTURES, "member-jsx");
 const RE_EXPORT = path.join(FIXTURES, "re-export");
 const AWAIT_TAINT = path.join(FIXTURES, "await-taint");
 const ITERATION_TAINT = path.join(FIXTURES, "iteration-taint");
+const ELEMENT_TAINT = path.join(FIXTURES, "element-access-taint");
 
 function analyze(dir: string, config = defaultConfig()) {
   const files = collectFiles(dir, config);
@@ -336,5 +337,50 @@ test("mutating collection calls merge argument taint into the receiver", () => {
   assert.ok(
     pushed.sources.some((source) => source.includes("process.env")),
     JSON.stringify(pushed.sources, null, 2),
+  );
+});
+
+test("bracket reads of sensitive members taint even when the base is unknown", () => {
+  const result = analyze(ELEMENT_TAINT);
+  const boundary = byRule(result.findings, RULES.CLIENT_BOUNDARY_PROP);
+  // `account` is an untainted prop: only the `["password"]` sensitive-member
+  // read can flag line 15.
+  const unknown = boundary.find((finding) => finding.line === 15);
+  assert.ok(unknown, JSON.stringify(boundary, null, 2));
+  assert.ok(
+    unknown.sources.some((source) => source.includes("….password")),
+    JSON.stringify(unknown.sources, null, 2),
+  );
+});
+
+test("string, single-quote, and template bracket keys read like dot access", () => {
+  const config = defaultConfig();
+  config.sensitiveIdentifiers = [];
+  config.sensitiveMembers = [];
+  const result = analyze(ELEMENT_TAINT, config);
+  const boundary = byRule(result.findings, RULES.CLIENT_BOUNDARY_PROP);
+  // `vault` is an awaited `server-only` result, so all three literal-key
+  // spellings inherit its provenance without sensitive-name matching.
+  for (const line of [16, 17, 18]) {
+    const keyed = boundary.find((finding) => finding.line === line);
+    assert.ok(keyed, `expected a finding on line ${line}: ${JSON.stringify(boundary, null, 2)}`);
+    assert.ok(
+      keyed.sources.some((source) => source.includes("loadVault")),
+      JSON.stringify(keyed.sources, null, 2),
+    );
+  }
+  // The bracket read binds `item`, which stays tainted into `<Card title>`.
+  const passthrough = boundary.find((finding) => finding.line === 19);
+  assert.ok(passthrough, JSON.stringify(boundary, null, 2));
+  assert.ok(
+    passthrough.sources.some((source) => source.includes("loadVault")),
+    JSON.stringify(passthrough.sources, null, 2),
+  );
+  // `cfg["apiKey"]` reads a tainted config object through a literal key.
+  const keyed = boundary.find((finding) => finding.line === 20);
+  assert.ok(keyed, JSON.stringify(boundary, null, 2));
+  assert.ok(
+    keyed.sources.some((source) => source.includes("loadConfig")),
+    JSON.stringify(keyed.sources, null, 2),
   );
 });

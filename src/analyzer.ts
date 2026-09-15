@@ -873,6 +873,8 @@ class FileWalker {
       this.processBinaryExpression(node);
     } else if (ts.isPropertyAccessExpression(node)) {
       this.processPropertyAccess(node);
+    } else if (ts.isElementAccessExpression(node)) {
+      this.processElementAccess(node);
     } else if (ts.isForOfStatement(node) || ts.isForInStatement(node)) {
       this.processForIteration(node);
     } else if (ts.isCallExpression(node) || ts.isNewExpression(node) || ts.isTaggedTemplateExpression(node)) {
@@ -1088,6 +1090,45 @@ class FileWalker {
       // `user.password` / `config.apiKey` taint by expression text.
       this.addTaint(node.getText(this.analysis.sf), `read of "….${name}" (sensitive member)`);
     }
+  }
+
+  private processElementAccess(node: ts.ElementAccessExpression): void {
+    const key = this.staticElementKey(node.argumentExpression);
+    const baseReasons = this.taintReasons(node.expression);
+    const baseText = node.expression.getText(this.analysis.sf);
+    if (baseReasons.length > 0) {
+      // `vault["password"]` reads exactly like `vault.password`: propagate
+      // the base provenance onto the full bracket text (so `labels[0]`
+      // keeps the `rows.map` / `process.env` chain instead of a shallow
+      // `read …` shadow) and onto the normalized member text (so
+      // `{ password }` destructures and later member reads agree).
+      for (const reason of baseReasons) {
+        this.addTaint(node.getText(this.analysis.sf), reason);
+        if (key !== null) {
+          this.addTaint(`${baseText}.${key}`, reason);
+        }
+      }
+      return;
+    }
+    if (key !== null && this.matchesAny(key, this.memberRE)) {
+      // Sensitive bracket read on an unknown base (`user["password"]`):
+      // mirror the `….member` provenance of `processPropertyAccess` so the
+      // finding points at the sensitive key rather than the base.
+      this.addTaint(node.getText(this.analysis.sf), `read of "….${key}" (sensitive member)`);
+    }
+  }
+
+  /**
+   * Best-effort static key of a bracket read: string-literal keys
+   * (`["password"]`) and no-substitution template keys (`` [`password`] ``)
+   * resolve to their text; anything else (identifiers, numbers, template
+   * expressions) is dynamic and yields `null`.
+   */
+  private staticElementKey(argument: ts.Expression): string | null {
+    if (ts.isStringLiteral(argument) || ts.isNoSubstitutionTemplateLiteral(argument)) {
+      return argument.text;
+    }
+    return null;
   }
 
   /**
@@ -1957,6 +1998,20 @@ class FileWalker {
         const tracked = this.analysis.taint.get(access.getText(this.analysis.sf));
         if (tracked) {
           return tracked.slice(0, 3);
+        }
+        const key = this.staticElementKey(access.argumentExpression);
+        if (key !== null) {
+          // A tainted normalized member (`vault.password` from a
+          // `vault["password"]` walk visit) answers the bracket form, and a
+          // sensitive literal key taints unknown bases like `user["password"]`.
+          const normalized = this.analysis.taint.get(`${access.expression.getText(this.analysis.sf)}.${key}`);
+          if (normalized) {
+            return normalized.slice(0, 3);
+          }
+          const memberReason = this.matchesAny(key, this.memberRE);
+          if (memberReason) {
+            return [`read of "….${memberReason}" (sensitive member)`];
+          }
         }
         return this.taintReasonsWorker(access.expression, depth + 1);
       }
