@@ -78,6 +78,8 @@ interface FileAnalysis {
   importSources: Set<string>;
   /** Namespace-import binding name -> resolved file, for member reads (`ns.secret`) and member tags (`<UI.Card>`). */
   namespaceImports: Map<string, string>;
+  /** Direct `const alias = value` identifier alias groups, used for collection mutations. */
+  immutableAliases: Map<string, Set<string>>;
   /** Expression key -> taint reasons. */
   taint: Map<string, string[]>;
   findings: Finding[];
@@ -248,6 +250,7 @@ export function analyzeFiles(files: string[], options: AnalyzeOptions = {}): Ana
       starNamespaces: new Map(),
       importSources: new Set(),
       namespaceImports: new Map(),
+      immutableAliases: new Map(),
       taint: new Map(),
       findings: [],
       seenFindingKeys: new Set(),
@@ -977,6 +980,7 @@ class FileWalker {
     if (!init) {
       return;
     }
+    this.recordImmutableAlias(node);
     // Function assigned to a variable: taint the binding if the body returns
     // tainted data, so downstream call sites and exports are caught.
     if (ts.isArrowFunction(init) || ts.isFunctionExpression(init)) {
@@ -1462,7 +1466,9 @@ class FileWalker {
         const receiver = call.expression.expression;
         if (ts.isIdentifier(receiver)) {
           for (const reason of reasons) {
-            this.addTaint(receiver.text, reason);
+            for (const alias of this.immutableAliasesFor(receiver.text)) {
+              this.addTaint(alias, reason);
+            }
           }
         } else {
           this.addTaint(receiver.getText(this.analysis.sf), reasons[0]);
@@ -1470,6 +1476,39 @@ class FileWalker {
         return;
       }
     }
+  }
+
+  /**
+   * Record only direct immutable aliases (`const alias = bucket`). The groups
+   * are merged so a mutation through any member of `a -> b -> c` taints every
+   * name. Mutable, property, and destructured aliases intentionally remain
+   * outside this lightweight per-file model.
+   */
+  private recordImmutableAlias(node: ts.VariableDeclaration): void {
+    if (
+      !ts.isIdentifier(node.name) ||
+      !node.initializer ||
+      !ts.isIdentifier(node.initializer) ||
+      !ts.isVariableDeclarationList(node.parent) ||
+      (node.parent.flags & ts.NodeFlags.Const) === 0
+    ) {
+      return;
+    }
+    const alias = node.name.text;
+    const source = node.initializer.text;
+    const aliases = new Set([
+      alias,
+      source,
+      ...(this.analysis.immutableAliases.get(alias) ?? []),
+      ...(this.analysis.immutableAliases.get(source) ?? []),
+    ]);
+    for (const name of aliases) {
+      this.analysis.immutableAliases.set(name, aliases);
+    }
+  }
+
+  private immutableAliasesFor(name: string): Set<string> {
+    return this.analysis.immutableAliases.get(name) ?? new Set([name]);
   }
 
   private taintReasonsFor(target: FileAnalysis, name: string): string[] {
