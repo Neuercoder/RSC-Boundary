@@ -13,6 +13,8 @@ const MEMBER_JSX = path.join(FIXTURES, "member-jsx");
 const RE_EXPORT = path.join(FIXTURES, "re-export");
 const AWAIT_TAINT = path.join(FIXTURES, "await-taint");
 const ITERATION_TAINT = path.join(FIXTURES, "iteration-taint");
+const ASSIGNMENT_TAINT = path.join(FIXTURES, "assignment-taint");
+const COLLECTION_ALIAS_TAINT = path.join(FIXTURES, "collection-alias-taint");
 
 function analyze(dir: string, config = defaultConfig()) {
   const files = collectFiles(dir, config);
@@ -339,7 +341,19 @@ test("mutating collection calls merge argument taint into the receiver", () => {
   );
 });
 
-const ASSIGNMENT_TAINT = path.join(FIXTURES, "assignment-taint");
+test("direct immutable collection aliases share mutation taint", () => {
+  const config = defaultConfig();
+  config.sensitiveIdentifiers = [];
+  config.sensitiveMembers = [];
+  const result = analyze(COLLECTION_ALIAS_TAINT, config);
+  const boundary = byRule(result.findings, RULES.CLIENT_BOUNDARY_PROP);
+  for (const line of [23, 24, 25]) {
+    const finding = boundary.find((candidate) => candidate.line === line);
+    assert.ok(finding, `expected an alias-mutation finding on line ${line}: ${JSON.stringify(boundary, null, 2)}`);
+    assert.ok(finding.sources.some((source) => source.includes("process.env.API_SECRET")));
+  }
+  assert.ok(!boundary.some((candidate) => candidate.line === 26), JSON.stringify(boundary, null, 2));
+});
 
 function assignmentBoundaries() {
   const config = defaultConfig();
