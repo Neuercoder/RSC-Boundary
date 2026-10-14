@@ -64,7 +64,8 @@ Taint flows through (conservative, per-file, fixpoint over ≤ 6 passes):
   `const { password } = user` (sensitive member), `const [first] = arr`.
 - Default parameter / binding initializers: `function f(token = process.env.T)`.
 - Object/array literals, spread, template literals, `+`, `??`, `&&`, `||`,
-  ternaries, parentheses, type assertions, unary expressions.
+  ternaries, parentheses, type assertions (`as`, `satisfies`), unary
+  expressions, `await`/`yield` pass-through.
 - Property/element reads on tainted bases (`obj.key`, `arr[0]`).
 - Calls: result is tainted when the callee is tainted (e.g. a server-module
   binding like `getUser(...)`), when any argument is tainted, or when the
@@ -170,7 +171,10 @@ model (`loadConfig`, `defaultConfig`, `mergeConfig`).
   are loop iteration (`for...of` / `for...in`), collection-callback element
   parameters (`rows.map((entry) => …)`), and mutating collection calls
   (`bucket.push(secret)`) — see
-  [iteration-collection-taint.md](iteration-collection-taint.md).
+  [iteration-collection-taint.md](iteration-collection-taint.md) — and
+  async/assignment-operator flow (`await`/`yield`, `||=`/`&&=`,
+  `satisfies`) is supported — see
+  [async-assignment-flow.md](async-assignment-flow.md).
 - Data sources are matched by name/call patterns, not by full type-aware
   dataflow across modules; false positives are expected and suppressible.
 - Assignment tracking remains monotonic within the existing fixpoint: control-flow
