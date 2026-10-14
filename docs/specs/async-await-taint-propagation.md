@@ -79,6 +79,8 @@ lib/session-store.ts:6:1  error  rsc/server-only-export  Server module exports s
   value.
 - Settled-status narrowing is not performed: `await` on a union that may
   resolve clean still taints conservatively when any branch is tainted.
-- `for await (... of ...)` iteration taint follows the existing
-  for-of behavior (no element taint is inferred from the iterated
-  expression), consistent with synchronous `for...of` handling.
+- `for await (... of ...)` shares the synchronous `for...of` taint
+  propagation implemented by the later
+  [iteration/collection milestone](iteration-collection-taint.md): a
+  tainted iterated expression taints the loop binding. No separate
+  async-iterator protocol or fulfillment-value analysis is performed.

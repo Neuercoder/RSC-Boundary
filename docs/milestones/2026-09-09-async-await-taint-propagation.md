@@ -50,5 +50,7 @@ their synchronous equivalents.
 - Promise combinators (`Promise.all`, `.then` chains) stay on the existing
   call-expression rule; fulfillment-value unwrapping is not modeled.
 - Settled-status narrowing (maybe-clean unions) stays conservative.
-- `for await...of` element taint follows the existing (non-inferring)
-  for-of behavior.
+- Loop-binding propagation was added by the later
+  [iteration/collection milestone](2026-09-14-iteration-collection-taint.md).
+  `for await...of` shares that `for...of` handling; separate async-iterator
+  protocol analysis remains out of scope.
