@@ -23,7 +23,7 @@ gaps without touching rule severities, messages, or the CLI contract.
 | --- | --- |
 | `await expr` | Taint of `expr` (sensitive callee, `process.env`, sensitive identifier). |
 | `yield expr` / `yield` | Same as `await`; bare `yield` is untainted. |
-| `x ||= tainted`, `x &&= tainted` | Identifier, property-access, and element-access targets are tainted (`compound-assigned …`), matching the existing `+=` wording. |
+| `x ||= tainted`, `x &&= tainted` | Identifier, property-access, and element-access targets are tainted (`assigned …`), matching the current logical-assignment handling. |
 | `obj[k] ||= tainted` | Element-access target tainted (new; previously only identifier/property targets were covered for `+=`). |
 | `x as T`, `x satisfies T` | Transparent wrappers, same as before (`satisfies` is new; `as`/assertion/non-null behavior unchanged). |
 
@@ -33,9 +33,11 @@ Rules:
    operand is evaluated at `depth + 1` and returned verbatim, so an
    `await`ed sensitive call keeps its provenance chain (`returns
    process.env…`, `result of call …`).
-2. Logical-assignment handling lives in `processBinaryExpression` next to
-   the existing `+=` branch and fires only when the right-hand side is
-   tainted (`isTainted(rhs)`), so `opts ||= "static"` stays silent.
+2. Logical-assignment handling lives in `processBinaryExpression` with
+   `=` and `??=` and fires only when the right-hand side has taint reasons,
+   so `opts ||= "static"` does not introduce taint. This follows the newer
+   [assignment-taint.md](assignment-taint.md) behavior; `+=` retains its
+   separate `compound-assigned …` wording.
 3. `satisfies` joins the existing `as`/assertion/non-null case; it
    evaluates the asserted expression and returns its reasons verbatim.
 
@@ -45,9 +47,9 @@ Rules:
 app/page.tsx:13:7  error  rsc/client-boundary-prop  Sensitive value flows into client component <Card> prop "title"
     tainted by: returns process.env; result of call loadSessionRecord(); returns read process.env.SESSION_ID
 app/page.tsx:14:7  error  rsc/client-boundary-prop  Sensitive value flows into client component <Card> prop "title"
-    tainted by: compound-assigned fallback
+    tainted by: assigned fallback
 app/page.tsx:15:7  error  rsc/client-boundary-prop  Sensitive value flows into client component <Card> prop "title"
-    tainted by: compound-assigned record
+    tainted by: assigned record
 ```
 
 The static-text `<Card title="static text" />` prop in the fixture stays

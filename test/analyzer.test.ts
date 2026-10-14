@@ -356,11 +356,11 @@ test("tracks taint through ||= and &&= compound assignments", () => {
   const boundary = byRule(result.findings, RULES.CLIENT_BOUNDARY_PROP);
   assert.ok(boundary.length >= 3, JSON.stringify(result.findings, null, 2));
   assert.ok(
-    boundary.some((finding) => finding.sources.some((source) => source.includes("compound-assigned fallback"))),
+    boundary.some((finding) => finding.sources.some((source) => source.includes("assigned fallback"))),
     JSON.stringify(boundary, null, 2),
   );
   assert.ok(
-    boundary.some((finding) => finding.sources.some((source) => source.includes("compound-assigned record"))),
+    boundary.some((finding) => finding.sources.some((source) => source.includes("assigned record"))),
     JSON.stringify(boundary, null, 2),
   );
   // The static-text prop stays silent.
@@ -368,4 +368,28 @@ test("tracks taint through ||= and &&= compound assignments", () => {
     !boundary.some((finding) => finding.message.includes("static text")),
     JSON.stringify(boundary, null, 2),
   );
+});
+
+const ASSIGNMENT_TAINT = path.join(FIXTURES, "assignment-taint");
+
+function assignmentBoundaries() {
+  const config = defaultConfig();
+  config.sensitiveIdentifiers = [];
+  config.sensitiveMembers = [];
+  return byRule(analyze(ASSIGNMENT_TAINT, config).findings, RULES.CLIENT_BOUNDARY_PROP);
+}
+
+test("logical assignments and indexed += preserve taint", () => {
+  const boundary = assignmentBoundaries();
+  for (const line of [21, 22, 23, 24, 25]) {
+    const finding = boundary.find((entry) => entry.line === line);
+    assert.ok(finding, JSON.stringify(boundary, null, 2));
+    assert.ok(finding.sources.some((source) => source.includes("process.env")));
+  }
+});
+
+test("assignment expression results propagate taint without tainting clean RHS or sibling indices", () => {
+  const boundary = assignmentBoundaries();
+  assert.deepEqual(boundary.map((finding) => finding.line).sort((a, b) => a - b),
+    [21, 22, 23, 24, 25, 26, 27, 28, 29]);
 });

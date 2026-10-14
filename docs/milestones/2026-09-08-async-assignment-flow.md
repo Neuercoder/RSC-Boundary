@@ -20,7 +20,8 @@ boundary findings before the fix).
   `YieldExpression` pass-through cases and a `SatisfiesExpression` case
   alongside the existing assertion handling; `processBinaryExpression`
   handles `||=` / `&&=` (plus element-access targets) with the existing
-  `compound-assigned …` wording, gated on a tainted RHS.
+  `assigned …` wording for logical assignments (aligned with the newer
+  assignment-taint milestone), gated on a tainted RHS.
 - Fixture app + unit/CLI tests covering awaited sensitive calls, `||=` /
   `&&=` propagation, and a static-text prop that must stay silent.
 - Spec + milestone docs; core-spec §5 propagation list, §11 limitation note,

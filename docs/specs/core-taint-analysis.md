@@ -54,8 +54,12 @@ intrinsic host element) is not reported.
 Taint flows through (conservative, per-file, fixpoint over ≤ 6 passes):
 
 - Variable declarations and assignments (`const x = src`, `x = tainted`,
-  `x ??= tainted`, compound `+=` / `||=` / `&&=`, incl. element-access
-  targets like `obj[k] ||= tainted`).
+  `x ??= tainted`, `x &&= tainted`, `x ||= tainted`, and compound `+=`).
+  `&&=` / `||=` propagate RHS taint to identifier, property-access, and
+  element-access targets; `+=` also supports element-access targets. For
+  assignment-expression results, `=` uses only its RHS, while `+=`, `??=`,
+  `&&=`, and `||=` conservatively inspect left then right, like `+`, `??`,
+  `&&`, and `||`. See [assignment-taint.md](assignment-taint.md) for details.
 - Destructuring: `const { email } = user` with a tainted `user`;
   `const { password } = user` (sensitive member), `const [first] = arr`.
 - Default parameter / binding initializers: `function f(token = process.env.T)`.
@@ -173,5 +177,10 @@ model (`loadConfig`, `defaultConfig`, `mergeConfig`).
   [async-assignment-flow.md](async-assignment-flow.md).
 - Data sources are matched by name/call patterns, not by full type-aware
   dataflow across modules; false positives are expected and suppressible.
+- Assignment tracking remains monotonic within the existing fixpoint: control-flow
+  feasibility is not modeled and clean overwrites do not clear taint. Element
+  accesses use exact-text indexed keys; alias tracking and enhanced
+  destructuring-assignment behavior are out of scope (see
+  [assignment-taint.md](assignment-taint.md)).
 - No serializers/DTO suggestions, no fix/auto-rewrite, no Next.js API-route or
   middleware coverage.
