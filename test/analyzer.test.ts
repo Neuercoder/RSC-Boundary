@@ -14,6 +14,7 @@ const RE_EXPORT = path.join(FIXTURES, "re-export");
 const AWAIT_TAINT = path.join(FIXTURES, "await-taint");
 const ITERATION_TAINT = path.join(FIXTURES, "iteration-taint");
 const SERVER_ACTIONS = path.join(FIXTURES, "server-actions");
+const ASSIGNMENT_TAINT = path.join(FIXTURES, "assignment-taint");
 
 function analyze(dir: string, config = defaultConfig()) {
   const files = collectFiles(dir, config);
@@ -380,4 +381,26 @@ test("flags inline use-server functions and taints their callers", () => {
     boundary.some((finding) => finding.message.includes('prop "title"')),
     JSON.stringify(boundary, null, 2),
   );
+});
+
+function assignmentBoundaries() {
+  const config = defaultConfig();
+  config.sensitiveIdentifiers = [];
+  config.sensitiveMembers = [];
+  return byRule(analyze(ASSIGNMENT_TAINT, config).findings, RULES.CLIENT_BOUNDARY_PROP);
+}
+
+test("logical assignments and indexed += preserve taint", () => {
+  const boundary = assignmentBoundaries();
+  for (const line of [21, 22, 23, 24, 25]) {
+    const finding = boundary.find((entry) => entry.line === line);
+    assert.ok(finding, JSON.stringify(boundary, null, 2));
+    assert.ok(finding.sources.some((source) => source.includes("process.env")));
+  }
+});
+
+test("assignment expression results propagate taint without tainting clean RHS or sibling indices", () => {
+  const boundary = assignmentBoundaries();
+  assert.deepEqual(boundary.map((finding) => finding.line).sort((a, b) => a - b),
+    [21, 22, 23, 24, 25, 26, 27, 28, 29]);
 });
