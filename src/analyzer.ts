@@ -1054,7 +1054,12 @@ class FileWalker {
 
   private processBinaryExpression(node: ts.BinaryExpression): void {
     const token = node.operatorToken.kind;
-    if (token === ts.SyntaxKind.EqualsToken || token === ts.SyntaxKind.QuestionQuestionEqualsToken) {
+    if (
+      token === ts.SyntaxKind.EqualsToken ||
+      token === ts.SyntaxKind.QuestionQuestionEqualsToken ||
+      token === ts.SyntaxKind.AmpersandAmpersandEqualsToken ||
+      token === ts.SyntaxKind.BarBarEqualsToken
+    ) {
       const rhsReasons = this.taintReasons(node.right);
       if (rhsReasons.length === 0) {
         return;
@@ -1074,7 +1079,10 @@ class FileWalker {
     }
     if (token === ts.SyntaxKind.PlusEqualsToken) {
       const lhs = node.left;
-      if ((ts.isIdentifier(lhs) || ts.isPropertyAccessExpression(lhs)) && this.isTainted(node.right)) {
+      if (
+        (ts.isIdentifier(lhs) || ts.isPropertyAccessExpression(lhs) || ts.isElementAccessExpression(lhs)) &&
+        this.isTainted(node.right)
+      ) {
         this.addTaint(lhs.getText(this.analysis.sf), `compound-assigned ${this.describe(node.right)}`);
       }
       return;
@@ -2062,11 +2070,19 @@ class FileWalker {
       case ts.SyntaxKind.BinaryExpression: {
         const binary = node as ts.BinaryExpression;
         const op = binary.operatorToken.kind;
+        // Plain assignment evaluates to the RHS, not the target's old value.
+        if (op === ts.SyntaxKind.EqualsToken) {
+          return this.taintReasonsWorker(binary.right, depth + 1);
+        }
         if (
           op === ts.SyntaxKind.PlusToken ||
           op === ts.SyntaxKind.QuestionQuestionToken ||
           op === ts.SyntaxKind.AmpersandAmpersandToken ||
-          op === ts.SyntaxKind.BarBarToken
+          op === ts.SyntaxKind.BarBarToken ||
+          op === ts.SyntaxKind.PlusEqualsToken ||
+          op === ts.SyntaxKind.QuestionQuestionEqualsToken ||
+          op === ts.SyntaxKind.AmpersandAmpersandEqualsToken ||
+          op === ts.SyntaxKind.BarBarEqualsToken
         ) {
           const left = this.taintReasonsWorker(binary.left, depth + 1);
           if (left.length > 0) {
