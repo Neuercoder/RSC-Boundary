@@ -13,6 +13,7 @@ const MEMBER_JSX = path.join(FIXTURES, "member-jsx");
 const RE_EXPORT = path.join(FIXTURES, "re-export");
 const AWAIT_TAINT = path.join(FIXTURES, "await-taint");
 const ITERATION_TAINT = path.join(FIXTURES, "iteration-taint");
+const ASSIGNMENT_TAINT = path.join(FIXTURES, "assignment-taint");
 const COLLECTION_ALIAS_TAINT = path.join(FIXTURES, "collection-alias-taint");
 
 function analyze(dir: string, config = defaultConfig()) {
@@ -352,4 +353,26 @@ test("direct immutable collection aliases share mutation taint", () => {
     assert.ok(finding.sources.some((source) => source.includes("process.env.API_SECRET")));
   }
   assert.ok(!boundary.some((candidate) => candidate.line === 26), JSON.stringify(boundary, null, 2));
+});
+
+function assignmentBoundaries() {
+  const config = defaultConfig();
+  config.sensitiveIdentifiers = [];
+  config.sensitiveMembers = [];
+  return byRule(analyze(ASSIGNMENT_TAINT, config).findings, RULES.CLIENT_BOUNDARY_PROP);
+}
+
+test("logical assignments and indexed += preserve taint", () => {
+  const boundary = assignmentBoundaries();
+  for (const line of [21, 22, 23, 24, 25]) {
+    const finding = boundary.find((entry) => entry.line === line);
+    assert.ok(finding, JSON.stringify(boundary, null, 2));
+    assert.ok(finding.sources.some((source) => source.includes("process.env")));
+  }
+});
+
+test("assignment expression results propagate taint without tainting clean RHS or sibling indices", () => {
+  const boundary = assignmentBoundaries();
+  assert.deepEqual(boundary.map((finding) => finding.line).sort((a, b) => a - b),
+    [21, 22, 23, 24, 25, 26, 27, 28, 29]);
 });

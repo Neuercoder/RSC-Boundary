@@ -67,6 +67,7 @@ CI (`.github/workflows/ci.yml`) runs install, build, test, and lint.
 - Await / satisfies / shorthand passthrough: [docs/specs/await-satisfies-shorthand.md](docs/specs/await-satisfies-shorthand.md)
 - Iteration / collection taint (`for...of`, `.map` callbacks, `.push` mutation): [docs/specs/iteration-collection-taint.md](docs/specs/iteration-collection-taint.md)
 - Direct immutable collection aliases: [docs/specs/collection-alias-mutation-taint.md](docs/specs/collection-alias-mutation-taint.md)
+- Assignment-operator taint (`&&=`, `||=`, `+=` element targets, assignment-expression results): [docs/specs/assignment-taint.md](docs/specs/assignment-taint.md)
 - Milestone tracker: [docs/milestones/](docs/milestones/)
 
 ## Current status
@@ -84,6 +85,8 @@ from` / `export * as ns` chains resolve across files, cycle-safe), and
 loop variables, `.map`-style callback element parameters, and
 `.push`-style mutating calls propagate taint), and **2026-09-16 — Direct
 Collection-Alias Mutation Taint** (direct `const` collection aliases share
-mutation taint, including transitive aliases). Known
-limitation (see spec §11): cross-module type-aware
-dataflow is not yet covered.
+mutation taint, including transitive aliases), and **2026-10-14 — Assignment
+Taint** (`&&=` / `||=` target propagation, element-access `+=`, and assignment
+expression results). Assignment-taint behavior and limitations are documented
+in the linked spec and milestone. Known limitation (see spec §11): cross-module
+type-aware dataflow is not yet covered.
