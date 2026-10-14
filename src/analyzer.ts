@@ -1004,6 +1004,12 @@ class FileWalker {
 
   /** First tainted return expression found in `fn`'s body (skipping nested functions). */
   private functionReturnsTainted(fn: ts.FunctionLikeDeclaration): string[] | null {
+    // Expression-bodied arrows have no ReturnStatement node, but their body
+    // is still the value returned at every call site.
+    if (fn.body && !ts.isBlock(fn.body)) {
+      const reasons = this.taintReasons(fn.body);
+      return reasons.length > 0 ? reasons.slice(0, 3) : null;
+    }
     let result: string[] | null = null;
     const visit = (node: ts.Node): void => {
       if (ts.isReturnStatement(node)) {
@@ -1447,6 +1453,30 @@ class FileWalker {
       return;
     }
     this.bindNames(callback.parameters[0].name, receiverReasons);
+  }
+
+  /**
+   * Taint-producing call shapes whose result is determined by an inline
+   * function body: immediately invoked functions and collection transforms
+   * (`map` / `flatMap`). A callback to another method is not assumed to feed
+   * its return value into the result (for example, `forEach`).
+   */
+  private inlineFunctionResultReasons(call: ts.CallExpression): string[] {
+    const callee = ts.isParenthesizedExpression(call.expression)
+      ? call.expression.expression
+      : call.expression;
+    if (ts.isArrowFunction(callee) || ts.isFunctionExpression(callee)) {
+      return this.functionReturnsTainted(callee) ?? [];
+    }
+    if (!ts.isPropertyAccessExpression(callee) || !/^(map|flatMap)$/.test(callee.name.text)) {
+      return [];
+    }
+    const callback = call.arguments[call.arguments.length - 1];
+    if (!callback || (!ts.isArrowFunction(callback) && !ts.isFunctionExpression(callback))) {
+      return [];
+    }
+    const reasons = this.functionReturnsTainted(callback);
+    return reasons ? [`result of call ${this.describe(call)}`, ...reasons].slice(0, 3) : [];
   }
 
   /**
@@ -1972,6 +2002,12 @@ class FileWalker {
       case ts.SyntaxKind.NewExpression: {
         const call = node as ts.CallExpression | ts.NewExpression;
         this.bindCallbackParameters(call);
+        if (ts.isCallExpression(call)) {
+          const inlineResultReasons = this.inlineFunctionResultReasons(call);
+          if (inlineResultReasons.length > 0) {
+            return inlineResultReasons.slice(0, 3);
+          }
+        }
         for (const arg of call.arguments ?? []) {
           const argReasons = this.taintReasonsWorker(arg, depth + 1);
           if (argReasons.length > 0) {
