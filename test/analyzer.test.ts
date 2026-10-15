@@ -362,3 +362,27 @@ test("assignment expression results propagate taint without tainting clean RHS o
   assert.deepEqual(boundary.map((finding) => finding.line).sort((a, b) => a - b),
     [21, 22, 23, 24, 25, 26, 27, 28, 29]);
 });
+
+const DESTRUCTURING_ASSIGNMENT = path.join(FIXTURES, "destructuring-assignment-taint");
+
+function destructuringAssignmentBoundaries() {
+  const config = defaultConfig();
+  config.sensitiveIdentifiers = [];
+  config.sensitiveMembers = [];
+  return byRule(analyze(DESTRUCTURING_ASSIGNMENT, config).findings, RULES.CLIENT_BOUNDARY_PROP);
+}
+
+test("destructuring assignments propagate source taint into nested, member, and rest targets", () => {
+  const boundary = destructuringAssignmentBoundaries();
+  for (const line of [28, 29, 30, 31, 32, 33, 34, 38]) {
+    const finding = boundary.find((entry) => entry.line === line);
+    assert.ok(finding, JSON.stringify(boundary, null, 2));
+    assert.ok(finding.sources.some((source) => source.includes("process.env")));
+  }
+});
+
+test("destructuring defaults propagate taint without tainting clean assignments or sibling indices", () => {
+  const boundary = destructuringAssignmentBoundaries();
+  assert.deepEqual(boundary.map((finding) => finding.line).sort((a, b) => a - b),
+    [28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38]);
+});

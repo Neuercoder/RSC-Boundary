@@ -1045,8 +1045,54 @@ class FileWalker {
     }
   }
 
+  /** Assignment patterns are expression nodes, unlike declaration binding patterns. */
+  private bindAssignmentTarget(target: ts.Expression, reasons: string[]): void {
+    if (ts.isParenthesizedExpression(target)) {
+      this.bindAssignmentTarget(target.expression, reasons);
+    } else if (
+      ts.isIdentifier(target) || ts.isPropertyAccessExpression(target) || ts.isElementAccessExpression(target)
+    ) {
+      for (const reason of reasons) {
+        this.addTaint(target.getText(this.analysis.sf), reason);
+      }
+    } else if (ts.isBinaryExpression(target) && target.operatorToken.kind === ts.SyntaxKind.EqualsToken) {
+      // Defaults are possible sources even when the destructured input is clean.
+      this.bindAssignmentTarget(target.left, [...reasons, ...this.taintReasons(target.right)]);
+    } else if (ts.isArrayLiteralExpression(target)) {
+      for (const element of target.elements) {
+        if (ts.isSpreadElement(element)) {
+          this.bindAssignmentTarget(element.expression, reasons);
+        } else if (!ts.isOmittedExpression(element)) {
+          this.bindAssignmentTarget(element, reasons);
+        }
+      }
+    } else if (ts.isObjectLiteralExpression(target)) {
+      for (const property of target.properties) {
+        if (ts.isPropertyAssignment(property)) {
+          this.bindAssignmentTarget(property.initializer, reasons);
+        } else if (ts.isShorthandPropertyAssignment(property)) {
+          const defaults = property.objectAssignmentInitializer
+            ? this.taintReasons(property.objectAssignmentInitializer) : [];
+          this.bindAssignmentTarget(property.name, [...reasons, ...defaults]);
+        } else if (ts.isSpreadAssignment(property)) {
+          this.bindAssignmentTarget(property.expression, reasons);
+        }
+      }
+    }
+  }
+
   private processBinaryExpression(node: ts.BinaryExpression): void {
     const token = node.operatorToken.kind;
+    if (token === ts.SyntaxKind.EqualsToken) {
+      let target = node.left;
+      while (ts.isParenthesizedExpression(target)) {
+        target = target.expression;
+      }
+      if (ts.isObjectLiteralExpression(target) || ts.isArrayLiteralExpression(target)) {
+        this.bindAssignmentTarget(target, this.taintReasons(node.right));
+        return;
+      }
+    }
     if (
       token === ts.SyntaxKind.EqualsToken ||
       token === ts.SyntaxKind.QuestionQuestionEqualsToken ||
@@ -1062,11 +1108,6 @@ class FileWalker {
         this.addTaint(lhs.text, `assigned ${this.describe(node.right)}`);
       } else if (ts.isPropertyAccessExpression(lhs) || ts.isElementAccessExpression(lhs)) {
         this.addTaint(lhs.getText(this.analysis.sf), `assigned ${this.describe(node.right)}`);
-      } else {
-        const pattern = ts.isParenthesizedExpression(lhs) ? lhs.expression : lhs;
-        if (ts.isObjectBindingPattern(pattern) || ts.isArrayBindingPattern(pattern)) {
-          this.bindNames(pattern, rhsReasons);
-        }
       }
       return;
     }
