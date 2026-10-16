@@ -362,3 +362,31 @@ test("assignment expression results propagate taint without tainting clean RHS o
   assert.deepEqual(boundary.map((finding) => finding.line).sort((a, b) => a - b),
     [21, 22, 23, 24, 25, 26, 27, 28, 29]);
 });
+
+const ARITHMETIC_TAINT = path.join(FIXTURES, "arithmetic-taint");
+const ARITHMETIC_OPERATORS = [
+  "subtract", "multiply", "divide", "remainder", "power",
+  "leftShift", "rightShift", "unsignedShift", "bitAnd", "bitOr", "bitXor",
+];
+
+test("arithmetic and bitwise expressions preserve taint from either operand", () => {
+  const config = defaultConfig();
+  config.sensitiveIdentifiers = [];
+  config.sensitiveMembers = [];
+  const boundary = byRule(analyze(ARITHMETIC_TAINT, config).findings, RULES.CLIENT_BOUNDARY_PROP);
+  const expected = ARITHMETIC_OPERATORS.flatMap((name) => [name + "Left", name + "Right"]);
+  expected.push("nested");
+  assert.deepEqual(
+    boundary.map((finding) => /prop "([^"]+)"/.exec(finding.message)?.[1]).sort(),
+    expected.sort(),
+  );
+  for (const finding of boundary) {
+    assert.ok(finding.sources.some((source) => source.includes("process.env")), JSON.stringify(finding));
+  }
+});
+
+test("clean arithmetic and bitwise operands remain untainted", () => {
+  const boundary = byRule(analyze(ARITHMETIC_TAINT).findings, RULES.CLIENT_BOUNDARY_PROP);
+  assert.ok(boundary.length > 0);
+  assert.ok(boundary.every((finding) => !finding.message.includes('Clean"')));
+});
