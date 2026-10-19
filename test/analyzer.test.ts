@@ -362,3 +362,30 @@ test("assignment expression results propagate taint without tainting clean RHS o
   assert.deepEqual(boundary.map((finding) => finding.line).sort((a, b) => a - b),
     [21, 22, 23, 24, 25, 26, 27, 28, 29]);
 });
+
+function commaFindings() {
+  const config = defaultConfig();
+  config.sensitiveIdentifiers = [];
+  config.sensitiveMembers = [];
+  return analyze(path.join(FIXTURES, "comma-taint"), config).findings;
+}
+
+test("comma expressions propagate only the final value, including nested sequences", () => {
+  const boundary = byRule(commaFindings(), RULES.CLIENT_BOUNDARY_PROP);
+  assert.deepEqual(boundary.map((finding) => finding.line).sort((a, b) => a - b),
+    [13, 14, 15, 16]);
+  for (const finding of boundary) {
+    assert.ok(finding.sources.some((source) => source.includes("process.env")));
+  }
+});
+
+test("comma expressions preserve earlier assignment effects without tainting the result", () => {
+  const boundary = byRule(commaFindings(), RULES.CLIENT_BOUNDARY_PROP);
+  assert.ok(boundary.some((finding) => finding.line === 16), "earlier assignment must taint current");
+  assert.ok(!boundary.some((finding) => finding.line === 19), "sequence result must stay clean");
+});
+
+test("external sinks use only the final comma-expression value", () => {
+  const sinks = byRule(commaFindings(), RULES.EXTERNAL_SINK);
+  assert.deepEqual(sinks.map((finding) => finding.line), [10]);
+});

@@ -67,6 +67,7 @@ CI (`.github/workflows/ci.yml`) runs install, build, test, and lint.
 - Await / satisfies / shorthand passthrough: [docs/specs/await-satisfies-shorthand.md](docs/specs/await-satisfies-shorthand.md)
 - Iteration / collection taint (`for...of`, `.map` callbacks, `.push` mutation): [docs/specs/iteration-collection-taint.md](docs/specs/iteration-collection-taint.md)
 - Assignment-operator taint (`&&=`, `||=`, `+=` element targets, assignment-expression results): [docs/specs/assignment-taint.md](docs/specs/assignment-taint.md)
+- Comma-expression result taint (final operand only, preserving earlier assignment effects): [spec](docs/specs/comma-expression-taint.md), [milestone](docs/milestones/2026-10-19-comma-expression-taint.md)
 - Milestone tracker: [docs/milestones/](docs/milestones/)
 
 ## Current status
