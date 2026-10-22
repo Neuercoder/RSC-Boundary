@@ -2003,6 +2003,13 @@ class FileWalker {
         if (this.callRE.some((re) => re.test(tagText))) {
           return [`tagged template ${tagText} (data source)`];
         }
+        // A tag is a callable value too: imported server helpers and local
+        // functions with tainted returns must behave like ordinary callees,
+        // including templates without substitutions.
+        const tagReasons = this.taintReasonsWorker(tagged.tag, depth + 1);
+        if (tagReasons.length > 0) {
+          return tagReasons.slice(0, 3);
+        }
         const template = tagged.template;
         if (ts.isNoSubstitutionTemplateLiteral(template)) {
           return [];
