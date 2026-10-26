@@ -1054,19 +1054,13 @@ class FileWalker {
       token === ts.SyntaxKind.BarBarEqualsToken
     ) {
       const rhsReasons = this.taintReasons(node.right);
-      if (rhsReasons.length === 0) {
-        return;
-      }
       const lhs = node.left;
-      if (ts.isIdentifier(lhs)) {
-        this.addTaint(lhs.text, `assigned ${this.describe(node.right)}`);
-      } else if (ts.isPropertyAccessExpression(lhs) || ts.isElementAccessExpression(lhs)) {
-        this.addTaint(lhs.getText(this.analysis.sf), `assigned ${this.describe(node.right)}`);
-      } else {
-        const pattern = ts.isParenthesizedExpression(lhs) ? lhs.expression : lhs;
-        if (ts.isObjectBindingPattern(pattern) || ts.isArrayBindingPattern(pattern)) {
-          this.bindNames(pattern, rhsReasons);
+      if (ts.isIdentifier(lhs) || ts.isPropertyAccessExpression(lhs) || ts.isElementAccessExpression(lhs)) {
+        if (rhsReasons.length > 0) {
+          this.addTaint(lhs.getText(this.analysis.sf), `assigned ${this.describe(node.right)}`);
         }
+      } else {
+        this.assignTargetTaint(lhs, rhsReasons);
       }
       return;
     }
@@ -1079,6 +1073,48 @@ class FileWalker {
         this.addTaint(lhs.getText(this.analysis.sf), `compound-assigned ${this.describe(node.right)}`);
       }
       return;
+    }
+  }
+
+  /**
+   * Assignment patterns are expression nodes, not declaration binding patterns.
+   * Conservatively pass whole-RHS taint to each target and include defaults,
+   * which can introduce a source even when the incoming value is clean.
+   */
+  private assignTargetTaint(target: ts.Expression, reasons: string[]): void {
+    if (ts.isParenthesizedExpression(target)) {
+      this.assignTargetTaint(target.expression, reasons);
+    } else if (
+      ts.isIdentifier(target) ||
+      ts.isPropertyAccessExpression(target) ||
+      ts.isElementAccessExpression(target)
+    ) {
+      for (const reason of reasons) {
+        this.addTaint(target.getText(this.analysis.sf), reason);
+      }
+    } else if (ts.isObjectLiteralExpression(target)) {
+      for (const property of target.properties) {
+        if (ts.isPropertyAssignment(property)) {
+          this.assignTargetTaint(property.initializer, reasons);
+        } else if (ts.isShorthandPropertyAssignment(property)) {
+          const defaults = property.objectAssignmentInitializer;
+          this.assignTargetTaint(property.name,
+            [...reasons, ...(defaults ? this.taintReasons(defaults) : [])]);
+        } else if (ts.isSpreadAssignment(property)) {
+          this.assignTargetTaint(property.expression, reasons);
+        }
+      }
+    } else if (ts.isArrayLiteralExpression(target)) {
+      for (const element of target.elements) {
+        this.assignTargetTaint(element, reasons);
+      }
+    } else if (ts.isSpreadElement(target)) {
+      this.assignTargetTaint(target.expression, reasons);
+    } else if (
+      ts.isBinaryExpression(target) &&
+      target.operatorToken.kind === ts.SyntaxKind.EqualsToken
+    ) {
+      this.assignTargetTaint(target.left, [...reasons, ...this.taintReasons(target.right)]);
     }
   }
 
