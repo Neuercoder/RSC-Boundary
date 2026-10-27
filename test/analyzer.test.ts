@@ -362,3 +362,20 @@ test("assignment expression results propagate taint without tainting clean RHS o
   assert.deepEqual(boundary.map((finding) => finding.line).sort((a, b) => a - b),
     [21, 22, 23, 24, 25, 26, 27, 28, 29]);
 });
+
+test("comma expressions propagate only their final operand and preserve assignment side effects", () => {
+  const result = analyze(path.join(FIXTURES, "comma-taint"));
+  const boundary = byRule(result.findings, RULES.CLIENT_BOUNDARY_PROP);
+  assert.deepEqual(boundary.map((finding) => finding.line).sort((a, b) => a - b), [12, 13, 14, 17]);
+  for (const finding of boundary) {
+    assert.ok(finding.sources.some((source) => source.includes("process.env.API_SECRET")));
+  }
+});
+
+test("comma expressions propagate final-operand taint into external sinks only", () => {
+  const result = analyze(path.join(FIXTURES, "comma-taint"));
+  const sinks = byRule(result.findings, RULES.EXTERNAL_SINK);
+  assert.equal(sinks.length, 1, JSON.stringify(sinks, null, 2));
+  assert.equal(sinks[0].line, 9);
+  assert.ok(sinks[0].sources.some((source) => source.includes("process.env.API_SECRET")));
+});
