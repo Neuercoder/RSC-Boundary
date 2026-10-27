@@ -162,3 +162,11 @@ test("runScan reports assignment leaks end to end", () => {
   const boundary = result.findings.filter((finding) => finding.ruleId === "rsc/client-boundary-prop");
   assert.equal(boundary.length, 9, JSON.stringify(result.findings, null, 2));
 });
+
+test("runScan reports comma-expression leaks without flagging discarded operands", () => {
+  const result = runScan([path.join(FIXTURES, "comma-taint"), "--json"], process.cwd());
+  assert.equal(result.code, 1);
+  assert.equal(result.findings.length, 5, JSON.stringify(result.findings, null, 2));
+  assert.equal(result.findings.filter((finding) => finding.ruleId === "rsc/client-boundary-prop").length, 4);
+  assert.equal(result.findings.filter((finding) => finding.ruleId === "rsc/external-sink").length, 1);
+});
