@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
 import * as path from "node:path";
+import * as fs from "node:fs";
+import * as os from "node:os";
 import { test } from "node:test";
 
 import { runScan } from "../src/cli";
@@ -161,4 +163,70 @@ test("runScan reports assignment leaks end to end", () => {
   assert.equal(result.code, 1);
   const boundary = result.findings.filter((finding) => finding.ruleId === "rsc/client-boundary-prop");
   assert.equal(boundary.length, 9, JSON.stringify(result.findings, null, 2));
+});
+
+test("CLI rejects unknown options before scanning without writing stdout", () => {
+  for (const args of [
+    ["--jsno", CLEAN],
+    ["--help", "--unknown"],
+    ["--help", CLEAN, LEAKY],
+    [CLEAN, "--json", "--unknown"],
+    ["-j", CLEAN],
+    ["--json=true", CLEAN],
+    [CLEAN, LEAKY],
+  ]) {
+    const result = spawnSync(process.execPath, [CLI, "scan", ...args], { encoding: "utf8" });
+    assert.equal(result.status, 2, JSON.stringify(args));
+    assert.equal(result.stdout, "");
+    assert.match(result.stderr, /rsc-boundary: (unknown option|expected at most one scan path)/);
+  }
+});
+
+test("CLI accepts JSON options before or after the path", () => {
+  for (const args of [["--json", CLEAN], [CLEAN, "--json"], ["--json", "--json", CLEAN]]) {
+    const result = spawnSync(process.execPath, [CLI, "scan", ...args], { encoding: "utf8" });
+    assert.equal(result.status, 0, result.stderr);
+    assert.deepEqual(JSON.parse(result.stdout), []);
+    assert.equal(result.stderr, "");
+  }
+});
+
+test("CLI terminator supports dash-prefixed paths without interpreting options", () => {
+  const cwd = fs.mkdtempSync(path.join(os.tmpdir(), "rsc-boundary-args-"));
+  try {
+    for (const name of ["--help", "--json", "--", "-project", "-"]) {
+      fs.mkdirSync(path.join(cwd, name));
+      fs.writeFileSync(path.join(cwd, name, "page.tsx"), 'export default function Page() { return <p>Hello</p>; }');
+      const result = spawnSync(process.execPath, [CLI, "scan", "--json", "--", name], {
+        cwd, encoding: "utf8",
+      });
+      assert.equal(result.status, 0, result.stderr);
+      assert.deepEqual(JSON.parse(result.stdout), []);
+      assert.equal(result.stderr, "");
+    }
+    const extra = spawnSync(process.execPath, [CLI, "scan", "--", "--help", "--json"], {
+      cwd, encoding: "utf8",
+    });
+    assert.equal(extra.status, 2);
+    assert.equal(extra.stdout, "");
+    const defaultPath = spawnSync(process.execPath, [CLI, "scan", "--json", "--"], {
+      cwd, encoding: "utf8",
+    });
+    assert.equal(defaultPath.status, 0, defaultPath.stderr);
+    assert.deepEqual(JSON.parse(defaultPath.stdout), []);
+  } finally {
+    fs.rmSync(cwd, { recursive: true, force: true });
+  }
+});
+
+test("CLI preserves help and missing-command exit codes", () => {
+  for (const args of [["--help"], ["scan", "--help"]]) {
+    const result = spawnSync(process.execPath, [CLI, ...args], { encoding: "utf8" });
+    assert.equal(result.status, 0);
+    assert.match(result.stdout, /usage: rsc-boundary scan/);
+    assert.equal(result.stderr, "");
+  }
+  const missing = spawnSync(process.execPath, [CLI], { encoding: "utf8" });
+  assert.equal(missing.status, 2);
+  assert.match(missing.stdout, /usage:/);
 });

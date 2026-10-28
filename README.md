@@ -15,6 +15,9 @@ npm run scan -- <path> --json   # findings as JSON (CI-friendly)
 ```
 
 Exit codes: `0` = clean, `1` = findings, `2` = usage/runtime error.
+Unknown options are errors. Use `scan --json -- -project` for a dash-prefixed
+path; options after `--` are treated as paths. See the
+[CLI argument specification](docs/specs/cli-argument-validation.md).
 
 ## What it detects
 
