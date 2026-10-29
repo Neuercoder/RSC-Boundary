@@ -362,3 +362,35 @@ test("assignment expression results propagate taint without tainting clean RHS o
   assert.deepEqual(boundary.map((finding) => finding.line).sort((a, b) => a - b),
     [21, 22, 23, 24, 25, 26, 27, 28, 29]);
 });
+
+const DESTRUCTURING_ASSIGNMENT = path.join(FIXTURES, "destructuring-assignment");
+const DESTRUCTURING_PROPS = [
+  "objectAlias", "shorthand", "nested", "arrayFirst", "arrayNested",
+  "arrayRest", "objectRest", "propertyTarget", "elementTarget",
+  "objectDefault", "shorthandDefault", "arrayDefault", "nestedDefault",
+  "expressionResult", "assignedResult",
+];
+
+function destructuringProps(config: RscBoundaryConfig) {
+  const boundary = byRule(analyze(DESTRUCTURING_ASSIGNMENT, config).findings, RULES.CLIENT_BOUNDARY_PROP);
+  return boundary.map((finding) => /prop "([^"]+)"/.exec(finding.message)?.[1]).sort();
+}
+
+test("destructuring assignments propagate RHS and default taint without sensitive-name heuristics", () => {
+  const config = defaultConfig();
+  config.sensitiveIdentifiers = [];
+  config.sensitiveMembers = [];
+  assert.deepEqual(destructuringProps(config), [...DESTRUCTURING_PROPS].sort());
+});
+
+test("destructuring assignments recognize sensitive member keys including nested and quoted keys", () => {
+  assert.deepEqual(destructuringProps(defaultConfig()),
+    [...DESTRUCTURING_PROPS, "sensitiveMember", "quotedMember", "nestedMember"].sort());
+  const boundary = byRule(analyze(DESTRUCTURING_ASSIGNMENT).findings, RULES.CLIENT_BOUNDARY_PROP);
+  for (const [prop, member] of [
+    ["sensitiveMember", "password"], ["quotedMember", "apiKey"], ["nestedMember", "credentials"],
+  ]) {
+    const finding = boundary.find((entry) => entry.message.includes(`prop "${prop}"`));
+    assert.ok(finding?.sources.some((source) => source.includes(member)), JSON.stringify(finding));
+  }
+});
