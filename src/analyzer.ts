@@ -1047,6 +1047,16 @@ class FileWalker {
 
   private processBinaryExpression(node: ts.BinaryExpression): void {
     const token = node.operatorToken.kind;
+    // Assignment patterns are expressions, not the binding patterns used by
+    // variable declarations. Visit them even when the source itself is clean:
+    // a default or a sensitive object member can introduce taint on its own.
+    if (token === ts.SyntaxKind.EqualsToken) {
+      const lhs = ts.isParenthesizedExpression(node.left) ? node.left.expression : node.left;
+      if (ts.isObjectLiteralExpression(lhs) || ts.isArrayLiteralExpression(lhs)) {
+        this.bindAssignmentTarget(lhs, this.taintReasons(node.right));
+        return;
+      }
+    }
     if (
       token === ts.SyntaxKind.EqualsToken ||
       token === ts.SyntaxKind.QuestionQuestionEqualsToken ||
@@ -1062,11 +1072,6 @@ class FileWalker {
         this.addTaint(lhs.text, `assigned ${this.describe(node.right)}`);
       } else if (ts.isPropertyAccessExpression(lhs) || ts.isElementAccessExpression(lhs)) {
         this.addTaint(lhs.getText(this.analysis.sf), `assigned ${this.describe(node.right)}`);
-      } else {
-        const pattern = ts.isParenthesizedExpression(lhs) ? lhs.expression : lhs;
-        if (ts.isObjectBindingPattern(pattern) || ts.isArrayBindingPattern(pattern)) {
-          this.bindNames(pattern, rhsReasons);
-        }
       }
       return;
     }
@@ -1079,6 +1084,58 @@ class FileWalker {
         this.addTaint(lhs.getText(this.analysis.sf), `compound-assigned ${this.describe(node.right)}`);
       }
       return;
+    }
+  }
+
+  /** Conservatively distribute source taint through a destructuring assignment. */
+  private bindAssignmentTarget(target: ts.Expression, reasons: string[]): void {
+    if (ts.isParenthesizedExpression(target)) {
+      this.bindAssignmentTarget(target.expression, reasons);
+    } else if (
+      ts.isIdentifier(target) ||
+      ts.isPropertyAccessExpression(target) ||
+      ts.isElementAccessExpression(target)
+    ) {
+      for (const reason of reasons) {
+        this.addTaint(target.getText(this.analysis.sf), reason);
+      }
+    } else if (ts.isBinaryExpression(target) && target.operatorToken.kind === ts.SyntaxKind.EqualsToken) {
+      this.bindAssignmentTarget(target.left, [...reasons, ...this.taintReasons(target.right)]);
+    } else if (ts.isArrayLiteralExpression(target)) {
+      for (const element of target.elements) {
+        if (ts.isSpreadElement(element)) {
+          this.bindAssignmentTarget(element.expression, reasons);
+        } else if (!ts.isOmittedExpression(element)) {
+          this.bindAssignmentTarget(element, reasons);
+        }
+      }
+    } else if (ts.isObjectLiteralExpression(target)) {
+      for (const property of target.properties) {
+        if (ts.isSpreadAssignment(property)) {
+          this.bindAssignmentTarget(property.expression, reasons);
+          continue;
+        }
+        if (!ts.isPropertyAssignment(property) && !ts.isShorthandPropertyAssignment(property)) {
+          continue;
+        }
+        const name = property.name;
+        const member = ts.isIdentifier(name) || ts.isStringLiteral(name)
+          ? name.text
+          : ts.isComputedPropertyName(name) && ts.isStringLiteral(name.expression)
+            ? name.expression.text
+            : null;
+        const memberReasons = member && this.matchesAny(member, this.memberRE)
+          ? [...reasons, `read of "….${member}" (sensitive member)`]
+          : reasons;
+        if (ts.isPropertyAssignment(property)) {
+          this.bindAssignmentTarget(property.initializer, memberReasons);
+        } else {
+          const defaults = property.objectAssignmentInitializer;
+          this.bindAssignmentTarget(property.name, defaults
+            ? [...memberReasons, ...this.taintReasons(defaults)]
+            : memberReasons);
+        }
+      }
     }
   }
 
