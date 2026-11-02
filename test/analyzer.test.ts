@@ -362,3 +362,11 @@ test("assignment expression results propagate taint without tainting clean RHS o
   assert.deepEqual(boundary.map((finding) => finding.line).sort((a, b) => a - b),
     [21, 22, 23, 24, 25, 26, 27, 28, 29]);
 });
+
+test("splice and fill taint receivers only from stored values", () => {
+  const result = analyze(path.join(FIXTURES, "array-mutation"));
+  const boundary = byRule(result.findings, RULES.CLIENT_BOUNDARY_PROP);
+  assert.equal(boundary.length, 3);
+  assert.deepEqual(boundary.map((finding) => finding.line).sort((a, b) => a - b), [20, 21, 22]);
+  assert.ok(boundary.every((finding) => finding.sources.some((source) => source.includes("process.env.API_SECRET"))));
+});

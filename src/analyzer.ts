@@ -1461,10 +1461,19 @@ class FileWalker {
       return;
     }
     const method = call.expression.name.text;
-    if (!/^(push|unshift|add|set|append|insert)$/.test(method)) {
+    let storedArguments: readonly ts.Expression[];
+    if (method === "splice") {
+      // The start and delete-count arguments control positions, not values.
+      storedArguments = call.arguments.slice(2);
+    } else if (method === "fill") {
+      // Only the first argument is stored; start/end indices remain clean.
+      storedArguments = call.arguments.slice(0, 1);
+    } else if (/^(push|unshift|add|set|append|insert)$/.test(method)) {
+      storedArguments = call.arguments;
+    } else {
       return;
     }
-    for (const arg of call.arguments) {
+    for (const arg of storedArguments) {
       const reasons = this.taintReasons(arg);
       if (reasons.length > 0) {
         const receiver = call.expression.expression;

@@ -162,3 +162,10 @@ test("runScan reports assignment leaks end to end", () => {
   const boundary = result.findings.filter((finding) => finding.ruleId === "rsc/client-boundary-prop");
   assert.equal(boundary.length, 9, JSON.stringify(result.findings, null, 2));
 });
+
+test("runScan reports splice and fill leaks without tainting index-only mutations", () => {
+  const result = runScan([path.join(FIXTURES, "array-mutation"), "--json"], process.cwd());
+  assert.equal(result.code, 1);
+  assert.equal(result.findings.length, 3);
+  assert.ok(result.findings.every((finding) => finding.ruleId === "rsc/client-boundary-prop"));
+});
