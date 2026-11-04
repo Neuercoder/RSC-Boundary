@@ -1,55 +1,55 @@
-# Destructuring Assignment Taint
+# Destructuring-assignment taint propagation
 
-## Goal
+## Status
 
-Track sensitive values copied into existing variables or members through object
-and array destructuring assignments, not just declaration binding patterns.
+Implemented and locally verified in the [2026-11-04 milestone](../milestones/2026-11-04-destructuring-assignment-taint.md).
 
 ## Behavior
 
-- Plain `=` assignments with object or array patterns distribute RHS taint to
-  every target. TypeScript represents these patterns as object/array literal
-  expressions, not `ObjectBindingPattern` / `ArrayBindingPattern` nodes.
-- Supported targets are identifiers, property accesses, and element accesses.
-  Assignment keys keep the analyzer's existing exact-source-text semantics.
-- Recursively visit nested object/array patterns, renamed object properties,
-  shorthand properties, and object/array rest targets. Skip array holes.
-- Merge taint from default initializers into their target, even when the RHS
-  itself is clean. Defaults include `[value = source]`, `{ key: value = source }`,
-  and `{ value = source }` forms.
-- Preserve source provenance from the RHS/default. Use the existing monotonic
-  file-local fixpoint, including propagation through later assignments.
-- Clean RHS values and clean defaults introduce no taint. A tainted element
-  target does not taint a sibling index or its receiver.
-- Ordinary assignments, logical/compound assignments, declaration bindings,
-  assignment-expression results, rule IDs, configuration, and CLI contracts
-  are unchanged.
+Destructuring assignments propagate taint from the RHS to their destination reads.
+Unlike declaration binding patterns, TypeScript represents assignment patterns as
+object and array literal expressions.
 
-```tsx
-let value = "";
-let fallback = "";
-({ entry: value } = { entry: process.env.API_SECRET });
-[fallback = process.env.API_SECRET] = [];
-return <Card title={value + fallback} />; // client-boundary finding
-```
+Supported patterns include:
 
-## Limits
+- Object properties, renamed targets, and shorthand properties.
+- Array elements and holes.
+- Nested object and array patterns.
+- Object and array rest targets.
+- Identifier, property-access, and element-access destinations.
+- Defaults, including shorthand object defaults and nested pattern defaults.
+  Taint from either the incoming source or the default is retained.
+- Statically named sensitive object members, including identifier and string-literal
+  keys, even when the RHS has no known taint.
 
-This is conservative aggregate propagation, not field/position-sensitive
-selection: any taint on the RHS reaches all targets, including rest targets.
-Defaults are considered possible sources without checking whether a value is
-actually missing. Clean overwrites do not clear existing taint. Computed keys
-are not evaluated to select fields or introduce new sensitive-member sources;
-this milestone only propagates existing RHS/default taint. Alias identity,
-control-flow feasibility, and cross-module type-aware dataflow remain out of
-scope. The existing fixpoint pass limit still applies.
+Only destinations are marked: property keys and array holes are not assignment
+targets. Clean destinations and unrelated tracked properties or indices remain
+clean unless another source taints them.
 
-## Acceptance checks
+## Analysis model and limits
 
-- Analyzer fixture covers renamed and nested object/array targets, member and
-  indexed targets, rest elements, holes, defaults, and multi-pass propagation.
-- Sensitive-name matching is disabled in analyzer regressions to prove actual
-  dataflow; source provenance is asserted for RHS propagation.
-- Exact boundary-finding assertions protect clean assignments/defaults and a
-  sibling array index from false positives.
-- CLI regression expects exit 1 and the same eleven client-boundary findings.
+This uses the existing monotonic per-file fixpoint. A tainted RHS conservatively
+taints every destination; individual RHS members and indices are not projected
+onto individual targets. Defaults are considered regardless of runtime feasibility.
+Clean overwrites do not remove taint. Indexed destinations retain the analyzer's
+exact-text key model.
+
+Alias analysis, computed-key source inference, control-flow feasibility,
+cross-module type-aware dataflow, and changes to destructuring declarations,
+parameters, or loop binding semantics are out of scope.
+
+## Regression coverage
+
+The neutral-name fixture in `test/fixtures/destructuring-assignment/` covers each
+supported pattern, sensitive-member reads, a tainted source with a clean default,
+and clean RHS/default/property/index controls. Analyzer tests assert exact finding
+locations, and a built-CLI test checks JSON findings and exit status.
+
+The earlier `test/fixtures/destructuring-assignment-taint/` regressions are also
+retained: eleven client-boundary findings and four clean props, including
+source-provenance assertions with sensitive-name/member matching disabled,
+rest targets, shorthand defaults, and fixpoint propagation through later
+assignments. Its CLI regression checks the same eleven finding locations.
+Parenthesized assignment targets are unwrapped before pattern traversal.
+Ordinary assignments, logical/compound assignments, assignment-expression
+results, rule IDs, configuration, and CLI contracts remain unchanged.
