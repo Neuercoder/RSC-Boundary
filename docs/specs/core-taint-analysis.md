@@ -168,9 +168,11 @@ model (`loadConfig`, `defaultConfig`, `mergeConfig`).
   — `await` / `satisfies` / shorthand-object passthroughs are supported —
   see [await-satisfies-shorthand.md](await-satisfies-shorthand.md) — and so
   are loop iteration (`for...of` / `for...in`), collection-callback element
-  parameters (`rows.map((entry) => …)`), and mutating collection calls
+  parameters (`rows.map((entry) => …)`), mutating collection calls
   (`bucket.push(secret)`) — see
-  [iteration-collection-taint.md](iteration-collection-taint.md).
+  [iteration-collection-taint.md](iteration-collection-taint.md) — and
+  static-key bracket reads (`user["password"]`,
+  `` vault[`password`] ``) — see [element-access-taint.md](element-access-taint.md).
 - Data sources are matched by name/call patterns, not by full type-aware
   dataflow across modules; false positives are expected and suppressible.
 - Assignment tracking remains monotonic within the existing fixpoint: control-flow
