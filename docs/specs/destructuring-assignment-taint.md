@@ -44,3 +44,7 @@ The neutral-name fixture in `test/fixtures/destructuring-assignment/` covers eac
 supported pattern, sensitive-member reads, a tainted source with a clean default,
 and clean RHS/default/property/index controls. Analyzer tests assert exact finding
 locations, and a built-CLI test checks JSON findings and exit status.
+
+The provenance regression fixture additionally disables sensitive-name heuristics
+and checks twelve environment-derived boundary findings, including nested defaults,
+object rest, and member/index destinations, while retaining clean sibling controls.

@@ -179,3 +179,10 @@ test("CLI detects destructuring-assignment leaks end-to-end", () => {
   assert.equal(parsed.length, 15);
   assert.ok(parsed.every((f: { ruleId: string }) => f.ruleId === "rsc/client-boundary-prop"));
 });
+
+test("runScan reports destructuring assignment provenance leaks end to end", () => {
+  const result = runScan([path.join(FIXTURES, "destructuring-assignment-provenance"), "--json"], process.cwd());
+  assert.equal(result.code, 1);
+  const boundary = result.findings.filter((finding) => finding.ruleId === "rsc/client-boundary-prop");
+  assert.equal(boundary.length, 12, JSON.stringify(result.findings, null, 2));
+});
