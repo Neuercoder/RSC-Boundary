@@ -88,4 +88,8 @@ expression results). Assignment-taint behavior and limitations are documented
 in the linked spec and milestone. Known limitation (see spec §11): cross-module
 type-aware dataflow is not yet covered.
 
+### Arithmetic and bitwise taint
+
+Arithmetic (`-`, `*`, `/`, `%`, `**`) and bitwise (`<<`, `>>`, `>>>`, `&`, `|`, `^`) expressions preserve sensitive taint from either operand, including nested expressions. Numeric transformation is not treated as sanitization. This milestone does not add compound-assignment writes or control-flow analysis. See [the spec](docs/specs/arithmetic-taint.md).
+
 Latest milestone: [destructuring-assignment taint](docs/milestones/2026-11-04-destructuring-assignment-taint.md) ([specification](docs/specs/destructuring-assignment-taint.md)).
