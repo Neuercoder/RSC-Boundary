@@ -389,3 +389,13 @@ test("external sinks use only the final comma-expression value", () => {
   const sinks = byRule(commaFindings(), RULES.EXTERNAL_SINK);
   assert.deepEqual(sinks.map((finding) => finding.line), [10]);
 });
+
+test("destructuring assignments propagate taint to each supported target", () => {
+  const dir = path.join(FIXTURES, "destructuring-assignment");
+  const { findings } = analyze(dir);
+  const boundary = byRule(findings, RULES.CLIENT_BOUNDARY_PROP);
+  // The first fifteen props leak; the four clean controls must stay clean.
+  assert.deepEqual(boundary.map((f) => f.line).sort((a, b) => a - b),
+    Array.from({ length: 15 }, (_, i) => 26 + i));
+  assert.ok(boundary.every((f) => f.file.endsWith("page.tsx")));
+});

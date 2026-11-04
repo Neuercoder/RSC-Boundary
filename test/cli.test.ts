@@ -170,3 +170,20 @@ test("runScan reports comma-expression leaks without reporting discarded values"
   assert.equal(boundary.length, 4, JSON.stringify(result.findings, null, 2));
   assert.equal(result.findings.length, 5, JSON.stringify(result.findings, null, 2));
 });
+
+test("CLI detects destructuring-assignment leaks end-to-end", () => {
+  const dir = path.join(FIXTURES, "destructuring-assignment");
+  let out = "";
+  let code = 0;
+  try {
+    out = execFileSync(process.execPath, [CLI, "scan", dir, "--json"], { encoding: "utf8" });
+  } catch (error) {
+    const failed = error as { status?: number; stdout?: string };
+    code = failed.status ?? -1;
+    out = failed.stdout ?? "";
+  }
+  assert.equal(code, 1);
+  const parsed = JSON.parse(out);
+  assert.equal(parsed.length, 15);
+  assert.ok(parsed.every((f: { ruleId: string }) => f.ruleId === "rsc/client-boundary-prop"));
+});
