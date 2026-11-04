@@ -25,8 +25,16 @@ and static sensitive-member keys, with neutral-name regression coverage.
   compilation.
 - `npm run lint`: passed.
 - `git diff --check`: passed.
-- `node dist/cli.js scan test/fixtures/destructuring-assignment --json`:
+- `node dist/cli.js scan test/fixtures/destructuring-assignment-extended --json`:
   exited 1 with exactly 18 client-boundary findings and no clean-sibling findings.
 - Regression evidence: before implementation, the new CLI regression expected
   18 boundary findings but observed only 3. The two new analyzer tests also
   failed; existing tests continued to pass.
+
+## Integration with the 2026-11-04 milestone
+
+The base branch independently implemented the same feature. Its original
+`destructuring-assignment` fixture and both regressions are preserved. This
+milestone's broader fixture now lives in `destructuring-assignment-extended`.
+After merging the base, all 42 tests and lint pass; both fixture suites retain
+their expected findings (15 for the base fixture, 18 for the extended fixture).

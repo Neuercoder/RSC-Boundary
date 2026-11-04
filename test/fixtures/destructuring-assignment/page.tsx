@@ -1,48 +1,46 @@
 import { Card } from "./card";
 
 export default function Page() {
-  let renamed, plain, deep, first, inner, tail, remaining;
-  let fallback, short, arrayDefault, nestedDefault, sibling;
-  let fromMember, quoted, nestedMember, resultTarget, cleanObject, cleanArray;
-  const holder = {};
-  const slots = [];
-  const data = {};
-
-  ({ DATA: renamed, plain } = process.env);
-  ({ entry: { value: deep } } = { entry: { value: process.env.DATA } });
-  [first, , [inner], ...tail] = [process.env.DATA];
-  ({ ...remaining } = process.env);
-  ({ entry: holder.value, other: slots[0] } = process.env);
-  ({ entry: fallback = process.env.DATA, other: sibling } = { other: "ok" });
-  ({ short = process.env.DATA } = {});
-  [arrayDefault = process.env.DATA] = [];
-  ({ entry: { value: nestedDefault } = { value: process.env.DATA } } = {});
-  ({ password: fromMember, "apiKey": quoted, credentials: { value: nestedMember } } = data);
-  ({ entry: cleanObject } = { entry: "ok" });
-  [cleanArray] = ["ok"];
-
+  let first, second, third, fourth, fifth, sixth, seventh, eighth, ninth, tenth;
+  let clean, cleanDefault, eleventh, twelfth, thirteenth;
+  const box = { value: "", other: "" };
+  const items = [""];
+  ({ value: first } = { value: process.env.API_SECRET });
+  [second] = [process.env.API_SECRET];
+  ({ outer: { value: third } } = { outer: { value: process.env.API_SECRET } });
+  [, [fourth]] = [0, [process.env.API_SECRET]];
+  ({ value: fifth = process.env.API_SECRET } = {});
+  [sixth = process.env.API_SECRET] = [];
+  ({ ...seventh } = { value: process.env.API_SECRET });
+  [, ...eighth] = [0, process.env.API_SECRET];
+  ({ value: box.value } = { value: process.env.API_SECRET });
+  [items[0]] = [process.env.API_SECRET];
+  ({ password: ninth } = {});
+  ({ value: tenth = "public" } = { value: process.env.API_SECRET });
+  ({ value: clean } = { value: "public" });
+  [cleanDefault = "public"] = [];
+  ({ eleventh = process.env.API_SECRET } = {});
+  ({ twelfth } = { twelfth: process.env.API_SECRET });
+  ({ value: { leaf: thirteenth } = { leaf: process.env.API_SECRET } } = {});
   return <main>
-    <Card objectAlias={renamed} />
-    <Card shorthand={plain} />
-    <Card nested={deep} />
-    <Card arrayFirst={first} />
-    <Card arrayNested={inner} />
-    <Card arrayRest={tail} />
-    <Card objectRest={remaining} />
-    <Card propertyTarget={holder.value} />
-    <Card elementTarget={slots[0]} />
-    <Card objectDefault={fallback} />
-    <Card shorthandDefault={short} />
-    <Card arrayDefault={arrayDefault} />
-    <Card nestedDefault={nestedDefault} />
-    <Card sensitiveMember={fromMember} />
-    <Card quotedMember={quoted} />
-    <Card nestedMember={nestedMember} />
-    <Card expressionResult={({ entry: resultTarget } = process.env)} />
-    <Card assignedResult={resultTarget} />
-    <Card cleanSibling={sibling} />
-    <Card cleanIndex={slots[1]} />
-    <Card cleanObject={cleanObject} />
-    <Card cleanArray={cleanArray} />
+    <Card title={first} />
+    <Card title={second} />
+    <Card title={third} />
+    <Card title={fourth} />
+    <Card title={fifth} />
+    <Card title={sixth} />
+    <Card title={seventh} />
+    <Card title={eighth} />
+    <Card title={box.value} />
+    <Card title={items[0]} />
+    <Card title={ninth} />
+    <Card title={tenth} />
+    <Card title={eleventh} />
+    <Card title={twelfth} />
+    <Card title={thirteenth} />
+    <Card title={clean} />
+    <Card title={cleanDefault} />
+    <Card title={box.other} />
+    <Card title={items[1]} />
   </main>;
 }

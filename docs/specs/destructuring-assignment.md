@@ -35,7 +35,7 @@ and cross-module type-aware dataflow are outside this milestone.
 
 ## Regression coverage
 
-The neutral-name `destructuring-assignment` fixture is exercised through the
+The neutral-name `destructuring-assignment-extended` fixture is exercised through the
 analyzer with name/member heuristics disabled, with default configuration, and
 through the CLI scan API. Exact boundary-prop sets verify both leaks and clean
 siblings. Build, full tests, lint, diff checks, and a real CLI JSON scan are

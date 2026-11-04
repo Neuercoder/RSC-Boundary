@@ -363,7 +363,7 @@ test("assignment expression results propagate taint without tainting clean RHS o
     [21, 22, 23, 24, 25, 26, 27, 28, 29]);
 });
 
-const DESTRUCTURING_ASSIGNMENT = path.join(FIXTURES, "destructuring-assignment");
+const DESTRUCTURING_ASSIGNMENT = path.join(FIXTURES, "destructuring-assignment-extended");
 const DESTRUCTURING_PROPS = [
   "objectAlias", "shorthand", "nested", "arrayFirst", "arrayNested",
   "arrayRest", "objectRest", "propertyTarget", "elementTarget",
@@ -393,4 +393,14 @@ test("destructuring assignments recognize sensitive member keys including nested
     const finding = boundary.find((entry) => entry.message.includes(`prop "${prop}"`));
     assert.ok(finding?.sources.some((source) => source.includes(member)), JSON.stringify(finding));
   }
+});
+
+test("destructuring assignments propagate taint to each supported target", () => {
+  const dir = path.join(FIXTURES, "destructuring-assignment");
+  const { findings } = analyze(dir);
+  const boundary = byRule(findings, RULES.CLIENT_BOUNDARY_PROP);
+  // The first fifteen props leak; the four clean controls must stay clean.
+  assert.deepEqual(boundary.map((f) => f.line).sort((a, b) => a - b),
+    Array.from({ length: 15 }, (_, i) => 26 + i));
+  assert.ok(boundary.every((f) => f.file.endsWith("page.tsx")));
 });

@@ -90,3 +90,5 @@ expression results), and **2026-10-29 — Destructuring Assignment Taint**
 sensitive-member keys). Behavior and limitations are documented in the linked
 specs and milestones. Known limitation (see spec §11): cross-module
 type-aware dataflow is not yet covered.
+
+Latest milestone: [destructuring-assignment taint](docs/milestones/2026-11-04-destructuring-assignment-taint.md) ([specification](docs/specs/destructuring-assignment-taint.md)).

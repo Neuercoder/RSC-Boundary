@@ -1,2 +1,2 @@
 "use client";
-export function Card(props: Record<string, unknown>) { return <div>{String(props)}</div>; }
+export function Card({ title }: { title: string }) { return <div>{title}</div>; }
