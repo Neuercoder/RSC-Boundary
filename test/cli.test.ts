@@ -179,3 +179,17 @@ test("CLI detects destructuring-assignment leaks end-to-end", () => {
   assert.equal(parsed.length, 15);
   assert.ok(parsed.every((f: { ruleId: string }) => f.ruleId === "rsc/client-boundary-prop"));
 });
+
+test("CLI JSON reports destructuring-assignment findings", () => {
+  let stdout = "";
+  try {
+    execFileSync(process.execPath, [CLI, "scan", path.join(FIXTURES, "destructuring-assignment-source"), "--json"], { encoding: "utf8" });
+    assert.fail("expected exit 1");
+  } catch (error) {
+    const err = error as { status: number; stdout: string };
+    assert.equal(err.status, 1);
+    stdout = err.stdout;
+  }
+  const parsed = JSON.parse(stdout) as { ruleId: string }[];
+  assert.equal(parsed.filter((f) => f.ruleId === "rsc/client-boundary-prop").length, 10);
+});

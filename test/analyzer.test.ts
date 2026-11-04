@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import * as path from "node:path";
 import { test } from "node:test";
 
@@ -371,4 +372,18 @@ test("destructuring assignments propagate taint to each supported target", () =>
   assert.deepEqual(boundary.map((f) => f.line).sort((a, b) => a - b),
     Array.from({ length: 15 }, (_, i) => 26 + i));
   assert.ok(boundary.every((f) => f.file.endsWith("page.tsx")));
+});
+
+test("destructuring assignments propagate source and default taint to nested targets", () => {
+  const fixture = path.join(FIXTURES, "destructuring-assignment-source");
+  const result = analyze(fixture);
+  const boundary = result.findings.filter((f) => f.ruleId === RULES.CLIENT_BOUNDARY_PROP);
+  const lines = readFileSync(path.join(fixture, "page.tsx"), "utf8").split("\n");
+  assert.equal(boundary.length, 10);
+  for (const target of ["first", "second", "third", "fourth", "fifth", "holder.value", "entries[0]", "sixth", "seventh", "eighth"]) {
+    assert.ok(boundary.some((f) => lines[f.line - 1].includes(`title={${target}}`)), `missing taint for ${target}`);
+  }
+  for (const target of ["cleanObject", "cleanArray", "cleanFallback", "holder.other", "entries[1]"]) {
+    assert.ok(!boundary.some((f) => lines[f.line - 1].includes(`title={${target}}`)), `unexpected taint for ${target}`);
+  }
 });
