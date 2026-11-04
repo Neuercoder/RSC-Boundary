@@ -91,3 +91,5 @@ while position/count arguments do not). See the
 [milestone](docs/milestones/2026-11-02-array-mutation-taint.md). Assignment-taint behavior and limitations are documented
 in the linked spec and milestone. Known limitation (see spec §11): cross-module
 type-aware dataflow is not yet covered.
+
+Latest milestone: [destructuring-assignment taint](docs/milestones/2026-11-04-destructuring-assignment-taint.md) ([specification](docs/specs/destructuring-assignment-taint.md)).
