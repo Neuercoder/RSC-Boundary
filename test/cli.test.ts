@@ -163,10 +163,27 @@ test("runScan reports assignment leaks end to end", () => {
   assert.equal(boundary.length, 9, JSON.stringify(result.findings, null, 2));
 });
 
+test("CLI detects destructuring-assignment leaks end-to-end", () => {
+  const dir = path.join(FIXTURES, "destructuring-assignment");
+  let out = "";
+  let code = 0;
+  try {
+    out = execFileSync(process.execPath, [CLI, "scan", dir, "--json"], { encoding: "utf8" });
+  } catch (error) {
+    const failed = error as { status?: number; stdout?: string };
+    code = failed.status ?? -1;
+    out = failed.stdout ?? "";
+  }
+  assert.equal(code, 1);
+  const parsed = JSON.parse(out);
+  assert.equal(parsed.length, 15);
+  assert.ok(parsed.every((f: { ruleId: string }) => f.ruleId === "rsc/client-boundary-prop"));
+});
+
 test("CLI JSON reports destructuring-assignment findings", () => {
   let stdout = "";
   try {
-    execFileSync(process.execPath, [CLI, "scan", path.join(FIXTURES, "destructuring-assignment"), "--json"], { encoding: "utf8" });
+    execFileSync(process.execPath, [CLI, "scan", path.join(FIXTURES, "destructuring-assignment-source"), "--json"], { encoding: "utf8" });
     assert.fail("expected exit 1");
   } catch (error) {
     const err = error as { status: number; stdout: string };

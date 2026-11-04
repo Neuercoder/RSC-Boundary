@@ -1045,14 +1045,50 @@ class FileWalker {
     }
   }
 
+  /** Assignment patterns are expression nodes, not declaration binding patterns. */
+  private bindAssignmentTarget(target: ts.Expression, reasons: string[]): void {
+    if (ts.isParenthesizedExpression(target)) {
+      this.bindAssignmentTarget(target.expression, reasons);
+    } else if (ts.isIdentifier(target) || ts.isPropertyAccessExpression(target) || ts.isElementAccessExpression(target)) {
+      for (const reason of reasons) {
+        this.addTaint(target.getText(this.analysis.sf), reason);
+      }
+    } else if (ts.isBinaryExpression(target) && target.operatorToken.kind === ts.SyntaxKind.EqualsToken) {
+      // A default may be used even when the source itself is clean.
+      this.bindAssignmentTarget(target.left, [...reasons, ...this.taintReasons(target.right)]);
+    } else if (ts.isArrayLiteralExpression(target)) {
+      for (const element of target.elements) {
+        if (ts.isOmittedExpression(element)) {
+          continue;
+        }
+        this.bindAssignmentTarget(ts.isSpreadElement(element) ? element.expression : element, reasons);
+      }
+    } else if (ts.isObjectLiteralExpression(target)) {
+      for (const property of target.properties) {
+        if (ts.isSpreadAssignment(property)) {
+          this.bindAssignmentTarget(property.expression, reasons);
+          continue;
+        }
+        if (!ts.isPropertyAssignment(property) && !ts.isShorthandPropertyAssignment(property)) {
+          continue;
+        }
+        const member = ts.isIdentifier(property.name) || ts.isStringLiteral(property.name)
+          ? this.matchesAny(property.name.text, this.memberRE)
+          : null;
+        const memberReasons = member ? [`read of "user.${member}" (sensitive member)`] : [];
+        if (ts.isPropertyAssignment(property)) {
+          this.bindAssignmentTarget(property.initializer, [...reasons, ...memberReasons]);
+        } else {
+          const defaults = property.objectAssignmentInitializer
+            ? this.taintReasons(property.objectAssignmentInitializer) : [];
+          this.bindAssignmentTarget(property.name, [...reasons, ...memberReasons, ...defaults]);
+        }
+      }
+    }
+  }
+
   private processBinaryExpression(node: ts.BinaryExpression): void {
     const token = node.operatorToken.kind;
-    // Assignment patterns are expression nodes, unlike declaration bindings.
-    if (token === ts.SyntaxKind.EqualsToken &&
-      (ts.isObjectLiteralExpression(node.left) || ts.isArrayLiteralExpression(node.left))) {
-      this.bindAssignmentTarget(node.left, this.taintReasons(node.right));
-      return;
-    }
     if (
       token === ts.SyntaxKind.EqualsToken ||
       token === ts.SyntaxKind.QuestionQuestionEqualsToken ||
@@ -1060,6 +1096,11 @@ class FileWalker {
       token === ts.SyntaxKind.BarBarEqualsToken
     ) {
       const rhsReasons = this.taintReasons(node.right);
+      if (token === ts.SyntaxKind.EqualsToken &&
+          (ts.isObjectLiteralExpression(node.left) || ts.isArrayLiteralExpression(node.left))) {
+        this.bindAssignmentTarget(node.left, rhsReasons);
+        return;
+      }
       if (rhsReasons.length === 0) {
         return;
       }
@@ -1085,36 +1126,6 @@ class FileWalker {
         this.addTaint(lhs.getText(this.analysis.sf), `compound-assigned ${this.describe(node.right)}`);
       }
       return;
-    }
-  }
-
-  /** Conservatively pass source/default taint to leaves of an assignment pattern. */
-  private bindAssignmentTarget(target: ts.Expression, reasons: string[]): void {
-    if (ts.isParenthesizedExpression(target)) {
-      this.bindAssignmentTarget(target.expression, reasons);
-    } else if (ts.isIdentifier(target) || ts.isPropertyAccessExpression(target) || ts.isElementAccessExpression(target)) {
-      for (const reason of reasons) {
-        this.addTaint(target.getText(this.analysis.sf), reason);
-      }
-    } else if (ts.isBinaryExpression(target) && target.operatorToken.kind === ts.SyntaxKind.EqualsToken) {
-      this.bindAssignmentTarget(target.left, [...reasons, ...this.taintReasons(target.right)]);
-    } else if (ts.isArrayLiteralExpression(target)) {
-      for (const element of target.elements) {
-        this.bindAssignmentTarget(element, reasons);
-      }
-    } else if (ts.isSpreadElement(target)) {
-      this.bindAssignmentTarget(target.expression, reasons);
-    } else if (ts.isObjectLiteralExpression(target)) {
-      for (const property of target.properties) {
-        if (ts.isPropertyAssignment(property)) {
-          this.bindAssignmentTarget(property.initializer, reasons);
-        } else if (ts.isShorthandPropertyAssignment(property)) {
-          const defaults = property.objectAssignmentInitializer;
-          this.bindAssignmentTarget(property.name, [...reasons, ...(defaults ? this.taintReasons(defaults) : [])]);
-        } else if (ts.isSpreadAssignment(property)) {
-          this.bindAssignmentTarget(property.expression, reasons);
-        }
-      }
     }
   }
 

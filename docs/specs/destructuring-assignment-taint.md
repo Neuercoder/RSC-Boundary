@@ -2,45 +2,49 @@
 
 ## Status
 
-Implemented and locally verified in the [2026-10-23 milestone](../milestones/2026-10-23-destructuring-assignment-taint.md).
+Implemented and locally verified in the [2026-11-04 milestone](../milestones/2026-11-04-destructuring-assignment-taint.md).
 
 ## Behavior
 
-Plain `=` assignments with object or array patterns propagate taint from the
-right-hand side to every assignment target. TypeScript represents these patterns
-as object/array literal expressions, not the binding patterns used in declarations.
+Destructuring assignments propagate taint from the RHS to their destination reads.
+Unlike declaration binding patterns, TypeScript represents assignment patterns as
+object and array literal expressions.
 
-Supported targets and pattern forms:
+Supported patterns include:
 
-- Identifiers, property accesses, and element accesses.
-- Renamed and shorthand object properties, nested object/array patterns.
-- Array holes (ignored), array rest, and object rest.
-- Default initializers, including shorthand defaults (`({ value = fallback } = input)`).
-  Taint from the input or fallback reaches the corresponding target, even when
-  the other expression is clean. Defaults are conservatively considered without
-  checking whether the input could be `undefined`.
+- Object properties, renamed targets, and shorthand properties.
+- Array elements and holes.
+- Nested object and array patterns.
+- Object and array rest targets.
+- Identifier, property-access, and element-access destinations.
+- Defaults, including shorthand object defaults and nested pattern defaults.
+  Taint from either the incoming source or the default is retained.
+- Statically named sensitive object members, including identifier and string-literal
+  keys, even when the RHS has no known taint.
 
-For example, `({ value: result } = process.env)` and
-`[holder.value] = process.env` make subsequent reads of the respective targets
-tainted. `({ result = process.env.VALUE } = {})` also taints `result`.
-Clean patterns and clean defaults introduce no new taint by themselves.
+Only destinations are marked: property keys and array holes are not assignment
+targets. Clean destinations and unrelated tracked properties or indices remain
+clean unless another source taints them.
 
-## Analysis boundaries
+## Analysis model and limits
 
-The existing monotonic, per-file fixpoint analysis is unchanged. Whole-source
-taint is conservatively copied to every target; this is not field-sensitive
-extraction. Clean overwrites do not remove taint. Property and indexed targets
-use exact source-text keys, so sibling accesses are not tainted by target writes.
+This uses the existing monotonic per-file fixpoint. A tainted RHS conservatively
+taints every destination; individual RHS members and indices are not projected
+onto individual targets. Defaults are considered regardless of runtime feasibility.
+Clean overwrites do not remove taint. Indexed destinations retain the analyzer's
+exact-text key model.
 
-This milestone does not add alias tracking, control-flow feasibility, computed-key
-source inference, sensitive-member inference for clean destructured inputs,
-destructuring assignment targets in `for...of` / `for...in`, or cross-module
-type-aware dataflow. The result of a plain assignment remains its RHS, as defined
-by the preceding assignment-taint milestone.
+Alias analysis, computed-key source inference, control-flow feasibility,
+cross-module type-aware dataflow, and changes to destructuring declarations,
+parameters, or loop binding semantics are out of scope.
 
 ## Regression coverage
 
-The neutral-name `test/fixtures/destructuring-assignment/` fixture exercises source
-propagation, nesting, holes, rests, property/index targets, and both default forms.
-Analyzer tests check ten expected boundary findings and five clean/sibling reads;
-a built-CLI test checks JSON output and exit code 1.
+The neutral-name fixture in `test/fixtures/destructuring-assignment/` covers each
+supported pattern, sensitive-member reads, a tainted source with a clean default,
+and clean RHS/default/property/index controls. Analyzer tests assert exact finding
+locations, and a built-CLI test checks JSON findings and exit status.
+
+The additional `test/fixtures/destructuring-assignment-source/` fixture preserves
+source-expression and shorthand-default regressions from the 2026-10-23 milestone,
+with ten expected boundary findings and five clean/sibling controls.

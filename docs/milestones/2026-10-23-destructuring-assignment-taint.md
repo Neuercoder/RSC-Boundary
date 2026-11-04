@@ -12,6 +12,14 @@ Implemented and locally verified.
 - Include tainted default initializers, including shorthand defaults, even with clean RHS inputs.
 - Add a neutral-name fixture, analyzer assertions, built-CLI regression coverage, and a [behavior specification](../specs/destructuring-assignment-taint.md).
 
+## Integration with the 2026-11-04 milestone
+
+The current implementation and specification include the newer milestone's
+sensitive-member handling and broader pattern coverage. This milestone's original
+fixture is retained as `test/fixtures/destructuring-assignment-source/` to preserve
+its source-expression regressions alongside the newer fixture. Verification below
+records the original implementation before that integration.
+
 ## Limits and non-goals
 
 Preserve the existing monotonic fixpoint and whole-source conservative model.

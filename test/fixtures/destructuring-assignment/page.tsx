@@ -1,38 +1,46 @@
 import { Card } from "./card";
 
 export default function Page() {
-  const source = process.env.VALUE;
-  let first, second, third, fourth, fifth, sixth, seventh, eighth;
-  const holder = { value: "", other: "" };
-  const entries = ["", ""];
-  ({ value: first } = source);
-  [second] = source;
-  ({ outer: { value: third } } = source);
-  [, fourth, ...fifth] = source;
-  ({ value: holder.value } = source);
-  [entries[0]] = source;
-  ({ value: sixth = process.env.FALLBACK } = {});
-  ({ seventh = process.env.FALLBACK } = {});
-  ({ ...eighth } = source);
-  let cleanObject, cleanArray, cleanFallback;
-  ({ value: cleanObject } = { value: "public" });
-  [cleanArray] = ["public"];
-  ({ cleanFallback = "public" } = {});
-  return <>
+  let first, second, third, fourth, fifth, sixth, seventh, eighth, ninth, tenth;
+  let clean, cleanDefault, eleventh, twelfth, thirteenth;
+  const box = { value: "", other: "" };
+  const items = [""];
+  ({ value: first } = { value: process.env.API_SECRET });
+  [second] = [process.env.API_SECRET];
+  ({ outer: { value: third } } = { outer: { value: process.env.API_SECRET } });
+  [, [fourth]] = [0, [process.env.API_SECRET]];
+  ({ value: fifth = process.env.API_SECRET } = {});
+  [sixth = process.env.API_SECRET] = [];
+  ({ ...seventh } = { value: process.env.API_SECRET });
+  [, ...eighth] = [0, process.env.API_SECRET];
+  ({ value: box.value } = { value: process.env.API_SECRET });
+  [items[0]] = [process.env.API_SECRET];
+  ({ password: ninth } = {});
+  ({ value: tenth = "public" } = { value: process.env.API_SECRET });
+  ({ value: clean } = { value: "public" });
+  [cleanDefault = "public"] = [];
+  ({ eleventh = process.env.API_SECRET } = {});
+  ({ twelfth } = { twelfth: process.env.API_SECRET });
+  ({ value: { leaf: thirteenth } = { leaf: process.env.API_SECRET } } = {});
+  return <main>
     <Card title={first} />
     <Card title={second} />
     <Card title={third} />
     <Card title={fourth} />
     <Card title={fifth} />
-    <Card title={holder.value} />
-    <Card title={entries[0]} />
     <Card title={sixth} />
     <Card title={seventh} />
     <Card title={eighth} />
-    <Card title={cleanObject} />
-    <Card title={cleanArray} />
-    <Card title={cleanFallback} />
-    <Card title={holder.other} />
-    <Card title={entries[1]} />
-  </>;
+    <Card title={box.value} />
+    <Card title={items[0]} />
+    <Card title={ninth} />
+    <Card title={tenth} />
+    <Card title={eleventh} />
+    <Card title={twelfth} />
+    <Card title={thirteenth} />
+    <Card title={clean} />
+    <Card title={cleanDefault} />
+    <Card title={box.other} />
+    <Card title={items[1]} />
+  </main>;
 }
