@@ -1,41 +1,46 @@
 import { Card } from "./card";
 
 export default function Page() {
-  let shorthand = "", renamed = "", nested = "", array = "", rest = [];
-  let objectRest = {}, fallback = "", arrayDefault = "", nestedDefault = "";
-  let clean = "", publicDefault = "";
-  const box = { value: "" }, items = [""];
-  const data = { value: process.env.API_SECRET };
-  ({ shorthand } = data);
-  ({ value: renamed } = data);
-  ({ value: { deep: nested } } = data);
-  [array] = [process.env.API_SECRET];
-  [, ...rest] = [process.env.API_SECRET];
-  ({ ...objectRest } = data);
-  ({ value: box.value } = data);
+  let first, second, third, fourth, fifth, sixth, seventh, eighth, ninth, tenth;
+  let clean, cleanDefault, eleventh, twelfth, thirteenth;
+  const box = { value: "", other: "" };
+  const items = [""];
+  ({ value: first } = { value: process.env.API_SECRET });
+  [second] = [process.env.API_SECRET];
+  ({ outer: { value: third } } = { outer: { value: process.env.API_SECRET } });
+  [, [fourth]] = [0, [process.env.API_SECRET]];
+  ({ value: fifth = process.env.API_SECRET } = {});
+  [sixth = process.env.API_SECRET] = [];
+  ({ ...seventh } = { value: process.env.API_SECRET });
+  [, ...eighth] = [0, process.env.API_SECRET];
+  ({ value: box.value } = { value: process.env.API_SECRET });
   [items[0]] = [process.env.API_SECRET];
-  ({ value: fallback = process.env.API_SECRET } = {});
-  [arrayDefault = process.env.API_SECRET] = [];
-  ({ value: { deep: nestedDefault } = { deep: process.env.API_SECRET } } = {});
+  ({ password: ninth } = {});
+  ({ value: tenth = "public" } = { value: process.env.API_SECRET });
   ({ value: clean } = { value: "public" });
-  [publicDefault = "public"] = [];
-  let shortDefault = "";
-  ({ shortDefault = process.env.API_SECRET } = {});
+  [cleanDefault = "public"] = [];
+  ({ eleventh = process.env.API_SECRET } = {});
+  ({ twelfth } = { twelfth: process.env.API_SECRET });
+  ({ value: { leaf: thirteenth } = { leaf: process.env.API_SECRET } } = {});
   return <main>
-    <Card title={shorthand} />
-    <Card title={renamed} />
-    <Card title={nested} />
-    <Card title={array} />
-    <Card title={rest} />
-    <Card title={objectRest} />
+    <Card title={first} />
+    <Card title={second} />
+    <Card title={third} />
+    <Card title={fourth} />
+    <Card title={fifth} />
+    <Card title={sixth} />
+    <Card title={seventh} />
+    <Card title={eighth} />
     <Card title={box.value} />
     <Card title={items[0]} />
-    <Card title={fallback} />
-    <Card title={arrayDefault} />
-    <Card title={nestedDefault} />
-    <Card title={shortDefault} />
+    <Card title={ninth} />
+    <Card title={tenth} />
+    <Card title={eleventh} />
+    <Card title={twelfth} />
+    <Card title={thirteenth} />
     <Card title={clean} />
-    <Card title={publicDefault} />
+    <Card title={cleanDefault} />
+    <Card title={box.other} />
     <Card title={items[1]} />
   </main>;
 }

@@ -4,6 +4,12 @@
 
 Implemented and locally verified; publication tracked separately.
 
+Reconciled with the [2026-11-04 milestone](2026-11-04-destructuring-assignment-taint.md)
+when merging the current base. The shared implementation and sensitive-member
+coverage are retained; this milestone's source-provenance regressions now live in
+the separate `destructuring-assignment-provenance` fixture. The verification below
+records the original milestone run.
+
 ## Scope
 
 Close the assignment-taint milestone's destructuring-assignment gap using the

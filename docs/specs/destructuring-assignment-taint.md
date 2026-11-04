@@ -1,39 +1,50 @@
-# Destructuring Assignment Taint
+# Destructuring-assignment taint propagation
 
-Status: implemented in milestone [2026-10-26](../milestones/2026-10-26-destructuring-assignment-taint.md).
+## Status
 
-## Goal
-
-Detect sensitive values copied into existing bindings through object and array
-destructuring assignments. TypeScript represents these targets as object/array
-expression nodes, unlike declaration binding patterns.
+Implemented and locally verified in the [2026-11-04 milestone](../milestones/2026-11-04-destructuring-assignment-taint.md).
 
 ## Behavior
 
-- For a tainted RHS, conservatively propagate its provenance to every target:
-  shorthand, renamed properties, nested object/array patterns, rest targets,
-  property accesses, and indexed accesses.
-- Skip array holes. Do not taint property keys or unrelated sibling indices.
-- Include taint from shorthand, renamed, array, and nested defaults even if the
-  incoming RHS is clean. Defaults are considered possible, without determining
-  whether a value is actually missing.
-- Feed assigned targets into the existing per-file monotonic fixpoint. Preserve
-  ordinary assignment provenance and assignment-expression result behavior.
-- Keep fully clean destructuring and defaults clean.
+Destructuring assignments propagate taint from the RHS to their destination reads.
+Unlike declaration binding patterns, TypeScript represents assignment patterns as
+object and array literal expressions.
 
-For example, `({ value: title } = { value: process.env.API_SECRET })` taints
-`title`, and `[title = process.env.API_SECRET] = []` also taints `title`.
+Supported patterns include:
 
-## Limits
+- Object properties, renamed targets, and shorthand properties.
+- Array elements and holes.
+- Nested object and array patterns.
+- Object and array rest targets.
+- Identifier, property-access, and element-access destinations.
+- Defaults, including shorthand object defaults and nested pattern defaults.
+  Taint from either the incoming source or the default is retained.
+- Statically named sensitive object members, including identifier and string-literal
+  keys, even when the RHS has no known taint.
 
-Whole-RHS taint is not field-sensitive: one sensitive field can taint all targets.
-Clean overwrites do not clear taint. Alias tracking, computed-key selection,
-control-flow/default feasibility, cross-module dataflow, and changes to
-declaration binding patterns are outside this milestone.
+Only destinations are marked: property keys and array holes are not assignment
+targets. Clean destinations and unrelated tracked properties or indices remain
+clean unless another source taints them.
 
-## Verification
+## Analysis model and limits
 
-The fixture covers shorthand, renaming, nesting, array holes/rest, object rest,
-member/index targets, and default sources, with clean/default/sibling controls.
-Analyzer tests disable sensitive-name heuristics and assert source provenance.
-CLI tests assert the twelve expected client-boundary findings.
+This uses the existing monotonic per-file fixpoint. A tainted RHS conservatively
+taints every destination; individual RHS members and indices are not projected
+onto individual targets. Defaults are considered regardless of runtime feasibility.
+Clean overwrites do not remove taint. Indexed destinations retain the analyzer's
+exact-text key model.
+
+Alias analysis, computed-key source inference, control-flow feasibility,
+cross-module type-aware dataflow, and changes to destructuring declarations,
+parameters, or loop binding semantics are out of scope.
+
+## Regression coverage
+
+The neutral-name fixture in `test/fixtures/destructuring-assignment/` covers each
+supported pattern, sensitive-member reads, a tainted source with a clean default,
+and clean RHS/default/property/index controls. Analyzer tests assert exact finding
+locations, and a built-CLI test checks JSON findings and exit status.
+
+The provenance regression fixture additionally disables sensitive-name heuristics
+and checks twelve environment-derived boundary findings, including nested defaults,
+object rest, and member/index destinations, while retaining clean sibling controls.
