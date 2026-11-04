@@ -2,6 +2,7 @@
 
 export interface CardProps {
   title: string;
+  apiKey?: string;
 }
 
 export function Card({ title }: CardProps) {
