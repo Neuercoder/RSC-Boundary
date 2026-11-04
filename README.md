@@ -84,7 +84,11 @@ from` / `export * as ns` chains resolve across files, cycle-safe), and
 loop variables, `.map`-style callback element parameters, and
 `.push`-style mutating calls propagate taint), and **2026-10-14 — Assignment
 Taint** (`&&=` / `||=` target propagation, element-access `+=`, and assignment
-expression results). Assignment-taint behavior and limitations are documented
+expression results), and **2026-11-02 — Array Mutation Value Taint**
+(`splice` inserted values and `fill` stored values taint their receivers,
+while position/count arguments do not). See the
+[array mutation spec](docs/specs/array-mutation-taint.md) and
+[milestone](docs/milestones/2026-11-02-array-mutation-taint.md). Assignment-taint behavior and limitations are documented
 in the linked spec and milestone. Known limitation (see spec §11): cross-module
 type-aware dataflow is not yet covered.
 
