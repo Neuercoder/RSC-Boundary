@@ -362,3 +362,13 @@ test("assignment expression results propagate taint without tainting clean RHS o
   assert.deepEqual(boundary.map((finding) => finding.line).sort((a, b) => a - b),
     [21, 22, 23, 24, 25, 26, 27, 28, 29]);
 });
+
+test("destructuring assignments propagate taint to each supported target", () => {
+  const dir = path.join(FIXTURES, "destructuring-assignment");
+  const { findings } = analyze(dir);
+  const boundary = byRule(findings, RULES.CLIENT_BOUNDARY_PROP);
+  // The first fifteen props leak; the four clean controls must stay clean.
+  assert.deepEqual(boundary.map((f) => f.line).sort((a, b) => a - b),
+    Array.from({ length: 15 }, (_, i) => 26 + i));
+  assert.ok(boundary.every((f) => f.file.endsWith("page.tsx")));
+});
