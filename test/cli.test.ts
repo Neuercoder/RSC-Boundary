@@ -162,3 +162,19 @@ test("runScan reports assignment leaks end to end", () => {
   const boundary = result.findings.filter((finding) => finding.ruleId === "rsc/client-boundary-prop");
   assert.equal(boundary.length, 9, JSON.stringify(result.findings, null, 2));
 });
+
+test("CLI detects destructuring-assignment leaks end-to-end", () => {
+  const dir = path.join(FIXTURES, "destructuring-assignment");
+  let out = "";
+  let code = 0;
+  try {
+    out = execFileSync("node", [CLI, "scan", dir, "--json"], { encoding: "utf8" });
+  } catch (err: any) {
+    code = err.status ?? 0;
+    out = err.stdout?.toString() ?? "";
+  }
+  assert.equal(code, 1);
+  const parsed = JSON.parse(out);
+  assert.equal(parsed.length, 15);
+  assert.ok(parsed.every((f: any) => f.ruleId === "rsc/client-boundary-prop"));
+});
