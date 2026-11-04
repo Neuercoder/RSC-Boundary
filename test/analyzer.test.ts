@@ -380,3 +380,13 @@ test("tagged templates preserve tainted tags, substitutions, and configured sour
   }
   assert.equal(byRule(result.findings, RULES.EXTERNAL_SINK).length, 1);
 });
+
+test("destructuring assignments propagate taint to each supported target", () => {
+  const dir = path.join(FIXTURES, "destructuring-assignment");
+  const { findings } = analyze(dir);
+  const boundary = byRule(findings, RULES.CLIENT_BOUNDARY_PROP);
+  // The first fifteen props leak; the four clean controls must stay clean.
+  assert.deepEqual(boundary.map((f) => f.line).sort((a, b) => a - b),
+    Array.from({ length: 15 }, (_, i) => 26 + i));
+  assert.ok(boundary.every((f) => f.file.endsWith("page.tsx")));
+});
