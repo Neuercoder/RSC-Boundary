@@ -163,6 +163,15 @@ test("runScan reports assignment leaks end to end", () => {
   assert.equal(boundary.length, 9, JSON.stringify(result.findings, null, 2));
 });
 
+test("CLI reports tagged-template leaks but leaves clean tags silent", () => {
+  const result = runScan([path.join(FIXTURES, "tagged-template"), "--json"], process.cwd());
+  assert.equal(result.code, 1);
+  const boundary = result.findings.filter((finding) => finding.ruleId === "rsc/client-boundary-prop");
+  assert.equal(boundary.length, 6);
+  assert.ok(!boundary.some((finding) => /prop "(clean|publicValue)"/.test(finding.message)));
+  assert.equal(result.findings.filter((finding) => finding.ruleId === "rsc/external-sink").length, 1);
+});
+
 test("CLI detects destructuring-assignment leaks end-to-end", () => {
   const dir = path.join(FIXTURES, "destructuring-assignment");
   let out = "";
