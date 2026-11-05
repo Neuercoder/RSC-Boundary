@@ -372,3 +372,14 @@ test("destructuring assignments propagate taint to each supported target", () =>
     Array.from({ length: 15 }, (_, i) => 26 + i));
   assert.ok(boundary.every((f) => f.file.endsWith("page.tsx")));
 });
+
+test("nested binding defaults taint bound names in declarations and parameters", () => {
+  const config = defaultConfig();
+  config.sensitiveIdentifiers = [];
+  config.sensitiveMembers = [];
+  const result = analyze(path.join(FIXTURES, "nested-binding-defaults"), config);
+  const boundary = byRule(result.findings, RULES.CLIENT_BOUNDARY_PROP);
+  assert.deepEqual(boundary.map((finding) => finding.line).sort((a, b) => a - b),
+    [12, 15, 23, 24, 25, 26]);
+  assert.ok(boundary.every((finding) => finding.sources.some((source) => source.includes("process.env"))));
+});

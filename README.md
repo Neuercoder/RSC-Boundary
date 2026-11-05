@@ -88,4 +88,4 @@ expression results). Assignment-taint behavior and limitations are documented
 in the linked spec and milestone. Known limitation (see spec §11): cross-module
 type-aware dataflow is not yet covered.
 
-Latest milestone: [destructuring-assignment taint](docs/milestones/2026-11-04-destructuring-assignment-taint.md) ([specification](docs/specs/destructuring-assignment-taint.md)).
+Latest milestone: [nested binding-default taint](docs/milestones/2026-11-05-nested-binding-defaults.md) ([specification](docs/specs/nested-binding-defaults.md)). Sensitive defaults in nested object/array declaration and parameter bindings now propagate to their bound variables; clean defaults remain unflagged.
