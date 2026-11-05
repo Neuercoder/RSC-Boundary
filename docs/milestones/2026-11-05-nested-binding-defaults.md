@@ -1,6 +1,6 @@
 # Milestone: nested binding-default taint
 
-**Date:** 2026-11-05  
+**Date:** 2026-11-05
 **Status:** Implemented and locally verified
 
 ## Goal
