@@ -193,3 +193,10 @@ test("CLI JSON reports destructuring-assignment findings", () => {
   const parsed = JSON.parse(stdout) as { ruleId: string }[];
   assert.equal(parsed.filter((f) => f.ruleId === "rsc/client-boundary-prop").length, 10);
 });
+
+test("runScan reports computed-object-key leaks end to end", () => {
+  const result = runScan([path.join(FIXTURES, "computed-object-keys"), "--json"], process.cwd());
+  assert.equal(result.code, 1);
+  assert.equal(result.findings.length, 8, JSON.stringify(result.findings, null, 2));
+  assert.ok(result.findings.every((finding) => finding.ruleId === "rsc/client-boundary-prop"));
+});
