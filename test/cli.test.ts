@@ -186,3 +186,10 @@ test("runScan reports destructuring assignment provenance leaks end to end", () 
   const boundary = result.findings.filter((finding) => finding.ruleId === "rsc/client-boundary-prop");
   assert.equal(boundary.length, 12, JSON.stringify(result.findings, null, 2));
 });
+
+test("runScan reports computed-object-key leaks end to end", () => {
+  const result = runScan([path.join(FIXTURES, "computed-object-keys"), "--json"], process.cwd());
+  assert.equal(result.code, 1);
+  assert.equal(result.findings.length, 8, JSON.stringify(result.findings, null, 2));
+  assert.ok(result.findings.every((finding) => finding.ruleId === "rsc/client-boundary-prop"));
+});

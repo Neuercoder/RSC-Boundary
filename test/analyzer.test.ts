@@ -388,3 +388,15 @@ test("destructuring assignments preserve source provenance and propagate sources
       JSON.stringify(finding, null, 2));
   }
 });
+
+test("computed object keys propagate taint without flagging public keys", () => {
+  const result = analyze(path.join(FIXTURES, "computed-object-keys"));
+  const boundary = byRule(result.findings, RULES.CLIENT_BOUNDARY_PROP);
+  const expected = ["direct", "indirect", "nested", "spread", "method", "getter", "setter", "inline"];
+  assert.equal(boundary.length, expected.length, JSON.stringify(result.findings, null, 2));
+  for (const name of expected) {
+    assert.ok(boundary.some((finding) => finding.message.includes(`prop "${name}"`)), name);
+  }
+  assert.ok(boundary.find((finding) => finding.message.includes('prop "direct"'))
+    ?.sources.some((source) => source.includes("process.env.INTERNAL_VALUE")));
+});
