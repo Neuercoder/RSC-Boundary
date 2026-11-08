@@ -196,3 +196,10 @@ test("CLI detects binding-pattern leaks end-to-end", () => {
   assert.equal(parsed.length, 13);
   assert.ok(parsed.every((f: { ruleId: string }) => f.ruleId === "rsc/client-boundary-prop"));
 });
+
+test("runScan reports computed-object-key leaks end to end", () => {
+  const result = runScan([path.join(FIXTURES, "computed-object-keys"), "--json"], process.cwd());
+  assert.equal(result.code, 1);
+  assert.equal(result.findings.length, 8, JSON.stringify(result.findings, null, 2));
+  assert.ok(result.findings.every((finding) => finding.ruleId === "rsc/client-boundary-prop"));
+});
