@@ -383,3 +383,15 @@ test("nested binding defaults taint bound names in declarations and parameters",
     [12, 15, 23, 24, 25, 26]);
   assert.ok(boundary.every((finding) => finding.sources.some((source) => source.includes("process.env"))));
 });
+
+test("computed object keys propagate taint without flagging public keys", () => {
+  const result = analyze(path.join(FIXTURES, "computed-object-keys"));
+  const boundary = byRule(result.findings, RULES.CLIENT_BOUNDARY_PROP);
+  const expected = ["direct", "indirect", "nested", "spread", "method", "getter", "setter", "inline"];
+  assert.equal(boundary.length, expected.length, JSON.stringify(result.findings, null, 2));
+  for (const name of expected) {
+    assert.ok(boundary.some((finding) => finding.message.includes(`prop "${name}"`)), name);
+  }
+  assert.ok(boundary.find((finding) => finding.message.includes('prop "direct"'))
+    ?.sources.some((source) => source.includes("process.env.INTERNAL_VALUE")));
+});
