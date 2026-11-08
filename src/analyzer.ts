@@ -2140,6 +2140,14 @@ class FileWalker {
       case ts.SyntaxKind.ObjectLiteralExpression: {
         const object = node as ts.ObjectLiteralExpression;
         for (const prop of object.properties) {
+          // Computed keys are observable data too, even when their values
+          // (or method/accessor bodies) are public.
+          if (prop.name && ts.isComputedPropertyName(prop.name)) {
+            const reasons = this.taintReasonsWorker(prop.name.expression, depth + 1);
+            if (reasons.length > 0) {
+              return reasons.slice(0, 3);
+            }
+          }
           if (ts.isPropertyAssignment(prop)) {
             const reasons = this.taintReasonsWorker(prop.initializer, depth + 1);
             if (reasons.length > 0) {
