@@ -66,7 +66,9 @@ CI (`.github/workflows/ci.yml`) runs install, build, test, and lint.
 - Re-export traversal (barrel files): [docs/specs/re-export-traversal.md](docs/specs/re-export-traversal.md)
 - Await / satisfies / shorthand passthrough: [docs/specs/await-satisfies-shorthand.md](docs/specs/await-satisfies-shorthand.md)
 - Iteration / collection taint (`for...of`, `.map` callbacks, `.push` mutation): [docs/specs/iteration-collection-taint.md](docs/specs/iteration-collection-taint.md)
-- Functional return taint (IIFEs, `.map`, `.flatMap`): [docs/specs/functional-return-taint.md](docs/specs/functional-return-taint.md)- Assignment-operator taint (`&&=`, `||=`, `+=` element targets, assignment-expression results): [docs/specs/assignment-taint.md](docs/specs/assignment-taint.md)
+- Assignment-operator taint (`&&=`, `||=`, `+=` element targets, assignment-expression results): [docs/specs/assignment-taint.md](docs/specs/assignment-taint.md)
+- Functional return taint (IIFEs, `.map`, `.flatMap`): [docs/specs/functional-return-taint.md](docs/specs/functional-return-taint.md)
+- Computed object-key taint: [docs/specs/computed-object-key-taint.md](docs/specs/computed-object-key-taint.md)
 - Milestone tracker: [docs/milestones/](docs/milestones/)
 
 ## Current status
@@ -83,7 +85,12 @@ objects are transparent to taint), **2026-09-14 — Iteration / Collection
 Taint** (`for...of` / `for...in` loop variables, `.map`-style callback element
 parameters, and `.push`-style mutating calls propagate taint), **2026-10-14 —
 Assignment Taint** (`&&=` / `||=` target propagation, element-access `+=`, and
-assignment-expression results), and **2026-09-17 — Functional Return Taint**
+assignment-expression results), **2026-09-17 — Functional Return Taint**
 (return propagation through direct arrow/function IIFEs and inline `.map` /
-`.flatMap` callbacks). Known limitation (see spec §11): cross-module
-type-aware dataflow is not yet covered.
+`.flatMap` callbacks), **2026-11-04 — Destructuring-Assignment Taint**, and
+**2026-11-08 — Computed Object-Key Taint**. Known limitation (see spec §11):
+cross-module type-aware dataflow is not yet covered.
+
+Latest milestone: [computed object-key taint](docs/milestones/2026-11-08-computed-object-key-taint.md) ([specification](docs/specs/computed-object-key-taint.md)).
+
+Previous milestone: [destructuring-assignment taint](docs/milestones/2026-11-04-destructuring-assignment-taint.md) ([specification](docs/specs/destructuring-assignment-taint.md)).
