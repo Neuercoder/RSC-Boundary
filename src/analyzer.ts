@@ -1089,6 +1089,15 @@ class FileWalker {
 
   private processBinaryExpression(node: ts.BinaryExpression): void {
     const token = node.operatorToken.kind;
+    // A computed write exposes its key even when the stored value is public.
+    // Track the immediate receiver, as with other collection mutations.
+    if (token >= ts.SyntaxKind.FirstAssignment && token <= ts.SyntaxKind.LastAssignment &&
+        ts.isElementAccessExpression(node.left)) {
+      const receiver = node.left.expression.getText(this.analysis.sf);
+      for (const reason of this.taintReasons(node.left.argumentExpression)) {
+        this.addTaint(receiver, reason);
+      }
+    }
     if (
       token === ts.SyntaxKind.EqualsToken ||
       token === ts.SyntaxKind.QuestionQuestionEqualsToken ||
