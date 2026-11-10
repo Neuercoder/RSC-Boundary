@@ -1933,8 +1933,10 @@ class FileWalker {
 
     if (ts.isJsxElement(node)) {
       for (const child of node.children) {
-        if (ts.isJsxExpression(child) && child.expression) {
-          const reasons = this.taintReasons(child.expression);
+        const expression = ts.isJsxExpression(child) ? child.expression
+          : ts.isJsxFragment(child) ? child : undefined;
+        if (expression) {
+          const reasons = this.taintReasons(expression);
           if (reasons.length > 0) {
             this.emit(
               node,
@@ -2158,6 +2160,20 @@ class FileWalker {
             // literal when the binding is tainted so `{ secret }.secret`
             // and spreads stay flagged.
             const reasons = this.taintReasonsWorker(prop.name, depth + 1);
+            if (reasons.length > 0) {
+              return reasons.slice(0, 3);
+            }
+          }
+        }
+        return [];
+      }
+      case ts.SyntaxKind.JsxFragment: {
+        const fragment = node as ts.JsxFragment;
+        for (const child of fragment.children) {
+          const expression = ts.isJsxExpression(child) ? child.expression
+            : ts.isJsxFragment(child) ? child : undefined;
+          if (expression) {
+            const reasons = this.taintReasonsWorker(expression, depth + 1);
             if (reasons.length > 0) {
               return reasons.slice(0, 3);
             }
