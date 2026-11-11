@@ -392,3 +392,24 @@ test("computed object keys propagate taint without flagging public keys", () => 
   assert.ok(boundary.find((finding) => finding.message.includes('prop "direct"'))
     ?.sources.some((source) => source.includes("process.env.INTERNAL_VALUE")));
 });
+
+test("comma expressions propagate only their final value to boundaries and sinks", () => {
+  const config = defaultConfig();
+  config.sensitiveIdentifiers = [];
+  config.sensitiveMembers = [];
+  const result = analyze(path.join(FIXTURES, "comma-expression"), config);
+  const boundary = byRule(result.findings, RULES.CLIENT_BOUNDARY_PROP);
+  const expected = ["direct", "chain", "indirect", "nested", "template"];
+  assert.equal(boundary.length, expected.length, JSON.stringify(result.findings, null, 2));
+  for (const name of expected) {
+    assert.ok(boundary.some((finding) => finding.message.includes(`prop "${name}"`)), name);
+  }
+  for (const name of ["direct", "chain", "nested", "template"]) {
+    assert.ok(boundary.find((finding) => finding.message.includes(`prop "${name}"`))
+      ?.sources.some((source) => source.includes("process.env.INTERNAL_VALUE")), name);
+  }
+  const sinks = byRule(result.findings, RULES.EXTERNAL_SINK);
+  assert.equal(sinks.length, 1, JSON.stringify(sinks, null, 2));
+  assert.equal(sinks[0].line, 8);
+  assert.ok(sinks[0].sources.some((source) => source.includes("process.env.INTERNAL_VALUE")));
+});
