@@ -1,23 +1,43 @@
-# Comma-expression taint propagation
+# Comma-expression result taint
 
-Implemented and locally verified.
+## Goal
+
+Preserve sensitive data returned by a JavaScript comma expression. Previously,
+`(prepare(), process.env.INTERNAL_VALUE)` lost its source when evaluated as a
+whole, allowing a client prop or external-sink argument to appear clean.
 
 ## Behavior
 
-- A comma expression `(left, right)` derives its result taint only from `right`, matching JavaScript's result-value semantics.
-- Nested comma expressions recurse through their final operand. Sensitive values in discarded operands alone do not taint the result.
-- The normal AST traversal still visits both operands. Assignments in earlier operands retain their existing monotonic taint effects on their targets.
-- The result rule applies wherever expression taint is consumed, including initializers, client-component props, and external sinks.
-- Existing plain-assignment behavior is unchanged: its result also uses only the RHS.
+- A comma expression takes its value and taint reasons from its right operand.
+- Chained and nested comma expressions recursively use the final result.
+- Existing propagation applies to variable initializers, object values, template
+  substitutions, client props, and external-sink arguments.
+- Inline results preserve the final operand's source provenance; variable
+  bindings continue to use the analyzer's existing derived-value reasons.
+- A sensitive discarded operand does not taint a public result:
+  `(process.env.INTERNAL_VALUE, "public")` is clean as a value.
+- AST traversal still visits both operands. Assignment and sink side effects
+  retain their existing behavior; discarding a value does not suppress a sink.
 
-## Acceptance and verification
+No new rules, configuration, or dependencies are introduced. Commas separating
+arguments, array items, or declarations are not comma operators and are unchanged.
 
-`test/fixtures/comma-taint/` exercises sensitive final operands, nested sequences, discarded sensitive values, clean sequences, and an earlier assignment followed by a clean final value. Sensitive-name heuristics are disabled in analyzer tests so propagation is tested independently.
+## Acceptance
 
-- Analyzer tests require exactly four client-boundary findings and one external-sink finding, with environment-source provenance retained.
-- CLI regression requires exit code `1` and exactly five findings.
-- `npm test`: 41/41 passing, including build and four new regression tests.
+With sensitive-name heuristics disabled, `test/fixtures/comma-expression/` must report exactly five
+client-boundary findings (direct, chained, variable-derived, object-nested, and
+interpolated results) and one external sink. Four public-result boundary
+controls and a public-result sink must remain unflagged. Direct results and the
+sink must retain environment-source provenance.
+
+Additional regression coverage in `test/fixtures/comma-taint/` checks earlier
+assignment effects followed by public results, nested sequences, and discarded
+values. With sensitive-name heuristics disabled, it must report exactly four
+client-boundary findings and one external sink. The CLI regression requires
+exit code `1` and exactly five findings for this fixture.
 
 ## Limits
 
-No control-flow feasibility or alias tracking is added. Earlier assignments remain subject to the existing per-file, monotonic fixpoint: clean overwrites do not clear taint. This milestone does not add general implicit-flow analysis or other binary operators.
+This is expression-result propagation, not control-flow, alias, or cross-module
+analysis. Existing traversal order, recursion limits, conservative binding
+tracking, and name-based heuristics remain unchanged.
