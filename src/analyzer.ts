@@ -2084,8 +2084,9 @@ class FileWalker {
       case ts.SyntaxKind.BinaryExpression: {
         const binary = node as ts.BinaryExpression;
         const op = binary.operatorToken.kind;
-        // Plain assignment evaluates to the RHS, not the target's old value.
-        if (op === ts.SyntaxKind.EqualsToken) {
+        // Assignment and comma expressions evaluate to the RHS, not the
+        // target's old value or the discarded left operand.
+        if (op === ts.SyntaxKind.EqualsToken || op === ts.SyntaxKind.CommaToken) {
           return this.taintReasonsWorker(binary.right, depth + 1);
         }
         if (
