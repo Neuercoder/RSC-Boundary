@@ -90,10 +90,10 @@ expression results). Assignment-taint behavior and limitations are documented
 in the linked spec and milestone. Known limitation (see spec §11): cross-module
 type-aware dataflow is not yet covered.
 
-Latest milestone: [comma-expression result taint](docs/milestones/2026-11-11-comma-expression-taint.md) ([specification](docs/specs/comma-expression-taint.md)).
+Latest milestone: [comparison-result taint](docs/milestones/2026-11-13-comparison-result-taint.md) ([specification](docs/specs/comparison-result-taint.md)).
 
-Previous milestone: [computed object-key taint](docs/milestones/2026-11-08-computed-object-key-taint.md) ([specification](docs/specs/computed-object-key-taint.md)).
+Previous milestone: [comma-expression result taint](docs/milestones/2026-11-11-comma-expression-taint.md) ([specification](docs/specs/comma-expression-taint.md)).
+
+Earlier milestone: [computed object-key taint](docs/milestones/2026-11-08-computed-object-key-taint.md) ([specification](docs/specs/computed-object-key-taint.md)).
 
 Earlier milestone: [destructuring-assignment taint](docs/milestones/2026-11-04-destructuring-assignment-taint.md) ([specification](docs/specs/destructuring-assignment-taint.md)).
-
-See [comparison-result taint milestone](docs/milestones/2026-11-13-comparison-result-taint.md) for equality and relational comparison tracking.
