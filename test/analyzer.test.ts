@@ -405,3 +405,27 @@ test("comma expressions propagate only their final value to boundaries and sinks
   assert.equal(sinks[0].line, 8);
   assert.ok(sinks[0].sources.some((source) => source.includes("process.env.INTERNAL_VALUE")));
 });
+
+test("equality and relational comparisons preserve sensitive operands on either side", () => {
+  const config = defaultConfig();
+  config.sensitiveIdentifiers = [];
+  config.sensitiveMembers = [];
+  const result = analyze(path.join(FIXTURES, "comparison-taint"), config);
+  const boundary = byRule(result.findings, RULES.CLIENT_BOUNDARY_PROP);
+  const operators = ["equal", "notEqual", "strictEqual", "strictNotEqual", "less", "lessEqual", "greater", "greaterEqual"];
+  const expected = [...operators.flatMap((name) => [`${name}Left`, `${name}Right`]), "derived", "nested", "template"];
+  assert.equal(boundary.length, expected.length, JSON.stringify(result.findings, null, 2));
+  for (const name of expected) {
+    const finding = boundary.find((entry) => entry.message.includes(`prop "${name}"`));
+    assert.ok(finding, name);
+    assert.ok(finding.sources.length > 0, name);
+    if (name !== "derived") {
+      assert.ok(finding.sources.some((source) => source.includes("process.env.INTERNAL_VALUE")), name);
+    }
+  }
+  const sinks = byRule(result.findings, RULES.EXTERNAL_SINK);
+  assert.equal(sinks.length, 1, JSON.stringify(sinks, null, 2));
+  assert.equal(sinks[0].line, 6);
+  assert.ok(sinks[0].sources.some((source) => source.includes("process.env.INTERNAL_VALUE")));
+  assert.equal(result.findings.length, expected.length + 1);
+});
