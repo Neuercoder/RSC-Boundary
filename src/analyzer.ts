@@ -2081,6 +2081,16 @@ class FileWalker {
           return this.taintReasonsWorker(binary.right, depth + 1);
         }
         if (
+          // Comparisons reveal information about their operands; producing a
+          // boolean does not sanitize a sensitive value.
+          op === ts.SyntaxKind.EqualsEqualsToken ||
+          op === ts.SyntaxKind.ExclamationEqualsToken ||
+          op === ts.SyntaxKind.EqualsEqualsEqualsToken ||
+          op === ts.SyntaxKind.ExclamationEqualsEqualsToken ||
+          op === ts.SyntaxKind.LessThanToken ||
+          op === ts.SyntaxKind.LessThanEqualsToken ||
+          op === ts.SyntaxKind.GreaterThanToken ||
+          op === ts.SyntaxKind.GreaterThanEqualsToken ||
           op === ts.SyntaxKind.PlusToken ||
           op === ts.SyntaxKind.MinusToken ||
           op === ts.SyntaxKind.AsteriskToken ||
