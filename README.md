@@ -97,4 +97,6 @@ Previous milestone: [comma-expression result taint](docs/milestones/2026-11-11-c
 
 Earlier milestone: [computed object-key taint](docs/milestones/2026-11-08-computed-object-key-taint.md) ([specification](docs/specs/computed-object-key-taint.md)).
 
+Earlier milestone: [nested binding-default taint](docs/milestones/2026-11-05-nested-binding-defaults.md) ([specification](docs/specs/nested-binding-defaults.md)). Sensitive defaults in nested object/array declaration and parameter bindings now propagate to their bound variables; clean defaults remain unflagged.
+
 Earlier milestone: [destructuring-assignment taint](docs/milestones/2026-11-04-destructuring-assignment-taint.md) ([specification](docs/specs/destructuring-assignment-taint.md)).

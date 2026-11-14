@@ -180,6 +180,13 @@ test("CLI detects destructuring-assignment leaks end-to-end", () => {
   assert.ok(parsed.every((f: { ruleId: string }) => f.ruleId === "rsc/client-boundary-prop"));
 });
 
+test("CLI detects nested binding defaults end-to-end", () => {
+  const result = runScan([path.join(FIXTURES, "nested-binding-defaults"), "--json"], process.cwd());
+  assert.equal(result.code, 1);
+  assert.equal(result.findings.length, 6);
+  assert.ok(result.findings.every((finding) => finding.ruleId === "rsc/client-boundary-prop"));
+});
+
 test("runScan reports computed-object-key leaks end to end", () => {
   const result = runScan([path.join(FIXTURES, "computed-object-keys"), "--json"], process.cwd());
   assert.equal(result.code, 1);

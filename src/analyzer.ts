@@ -1033,7 +1033,7 @@ class FileWalker {
     // a destructured variable.
     const init = node.initializer;
     if (init && this.isTainted(init)) {
-      this.addTaint(this.bindingElementKey(node), `default value ${this.describe(init)}`);
+      this.bindNames(node.name, [`default value ${this.describe(init)}`]);
     }
   }
 
