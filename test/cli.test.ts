@@ -186,3 +186,10 @@ test("runScan reports computed-object-key leaks end to end", () => {
   assert.equal(result.findings.length, 8, JSON.stringify(result.findings, null, 2));
   assert.ok(result.findings.every((finding) => finding.ruleId === "rsc/client-boundary-prop"));
 });
+
+test("runScan reports JSX-fragment leaks end to end", () => {
+  const result = runScan([path.join(FIXTURES, "jsx-fragment-taint"), "--json"], process.cwd());
+  assert.equal(result.code, 1);
+  assert.equal(result.findings.length, 7, JSON.stringify(result.findings, null, 2));
+  assert.ok(result.findings.every((finding) => finding.ruleId === "rsc/client-boundary-prop"));
+});

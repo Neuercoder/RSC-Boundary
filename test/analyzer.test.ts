@@ -385,6 +385,16 @@ test("computed object keys propagate taint without flagging public keys", () => 
     ?.sources.some((source) => source.includes("process.env.INTERNAL_VALUE")));
 });
 
+test("JSX fragments preserve sensitive children at client boundaries", () => {
+  const result = analyze(path.join(FIXTURES, "jsx-fragment-taint"));
+  const boundary = byRule(result.findings, RULES.CLIENT_BOUNDARY_PROP);
+  assert.deepEqual(boundary.map((finding) => finding.line).sort((a, b) => a - b),
+    [9, 10, 11, 12, 13, 14, 15]);
+  assert.ok(boundary.every((finding) => finding.file.endsWith("page.tsx")));
+  assert.ok(boundary.find((finding) => finding.message.includes('prop "inline"'))
+    ?.sources.some((source) => source.includes("process.env.INTERNAL_VALUE")));
+});
+
 test("comma expressions propagate only their final value to boundaries and sinks", () => {
   const config = defaultConfig();
   config.sensitiveIdentifiers = [];
