@@ -3,7 +3,7 @@
  * rsc-boundary CLI.
  *
  * Usage:
- *   rsc-boundary scan [path] [--json]
+ *   rsc-boundary scan [--json] [--] [path]
  *
  *   path   file or directory to scan (defaults to ".")
  *   --json emit findings as a JSON array on stdout
@@ -17,7 +17,7 @@ import * as path from "path";
 import { analyzeFiles, collectFiles, Finding } from "./analyzer";
 import { LoadedConfig, loadConfig } from "./config";
 
-const USAGE = `usage: rsc-boundary scan [path] [--json]
+const USAGE = `usage: rsc-boundary scan [--json] [--] [path]
 
 Scans TypeScript sources for sensitive values crossing React Server
 Component boundaries (see docs/specs/core-taint-analysis.md).
@@ -28,6 +28,7 @@ positional:
 options:
   --json     emit findings as a JSON array on stdout
   --help     show this help
+  --         treat all remaining arguments as paths
 
 exit codes:
   0   no findings
@@ -42,20 +43,35 @@ export interface ScanCliResult {
 }
 
 export function runScan(argv: string[], cwd: string): ScanCliResult {
-  const json = argv.includes("--json");
-  let target = ".";
-  const positional = argv.filter(
-    (arg) => !arg.startsWith("--") || arg === "--",
-  );
-  if (positional.length > 1) {
+  let json = false;
+  let help = false;
+  let options = true;
+  const positional: string[] = [];
+  const usageError = (message: string): ScanCliResult => {
+    process.stderr.write(`rsc-boundary: ${message}\n`);
     return { code: 2, findings: [], scanned: 0, configPath: null };
+  };
+  for (const arg of argv) {
+    if (options && arg === "--") {
+      options = false;
+    } else if (options && arg === "--json") {
+      json = true;
+    } else if (options && arg === "--help") {
+      help = true;
+    } else if (options && arg.startsWith("-") && arg !== "-") {
+      return usageError(`unknown option "${arg}"`);
+    } else {
+      positional.push(arg);
+    }
   }
-  if (positional.length === 1) {
-    target = positional[0];
+  if (positional.length > 1) {
+    return usageError("expected at most one scan path");
   }
-  if (target === "--") {
-    target = ".";
+  if (help) {
+    process.stdout.write(USAGE + "\n");
+    return { code: 0, findings: [], scanned: 0, configPath: null };
   }
+  const target = positional[0] ?? ".";
 
   const resolved = path.resolve(cwd, target);
   if (!fs.existsSync(resolved)) {
@@ -102,7 +118,7 @@ export function runScan(argv: string[], cwd: string): ScanCliResult {
 }
 
 export async function main(argv: string[]): Promise<number> {
-  if (argv.length === 0 || argv.includes("--help")) {
+  if (argv.length === 0 || argv[0] === "--help") {
     process.stdout.write(USAGE + "\n");
     return argv.length === 0 ? 2 : 0;
   }
