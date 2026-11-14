@@ -67,6 +67,7 @@ CI (`.github/workflows/ci.yml`) runs install, build, test, and lint.
 - Await / satisfies / shorthand passthrough: [docs/specs/await-satisfies-shorthand.md](docs/specs/await-satisfies-shorthand.md)
 - Iteration / collection taint (`for...of`, `.map` callbacks, `.push` mutation): [docs/specs/iteration-collection-taint.md](docs/specs/iteration-collection-taint.md)
 - Assignment-operator taint (`&&=`, `||=`, `+=` element targets, assignment-expression results): [docs/specs/assignment-taint.md](docs/specs/assignment-taint.md)
+- Functional return taint (IIFEs, `.map`, `.flatMap`): [docs/specs/functional-return-taint.md](docs/specs/functional-return-taint.md)
 - Comma-expression result taint: [docs/specs/comma-expression-taint.md](docs/specs/comma-expression-taint.md)
 - Computed object-key taint: [docs/specs/computed-object-key-taint.md](docs/specs/computed-object-key-taint.md)
 - Arithmetic and bitwise expression-result taint: [docs/specs/arithmetic-bitwise-taint.md](docs/specs/arithmetic-bitwise-taint.md)
@@ -76,19 +77,21 @@ CI (`.github/workflows/ci.yml`) runs install, build, test, and lint.
 
 Implemented milestones **2026-09-03 — Core AST Taint Engine** (CLI, analyzer,
 config, tests, CI), **2026-09-04 — Path Alias Resolution** (`@/` and custom
-tsconfig-style import aliases, default `"@/*": ["./*"]`), and **2026-09-06 —
-Member JSX Components** (compound tags like `<Card.Header>` and
-`<Panel.Item>` are now treated as client-component boundaries), and
-**2026-09-07 — Re-export Traversal** (barrel `export *` / `export { x }
-from` / `export * as ns` chains resolve across files, cycle-safe), and
-**2026-09-13 — Await / Satisfies / Shorthand Passthrough** (`await`,
-`satisfies`, and `{ shorthand }` objects are transparent to taint), and
-**2026-09-14 — Iteration / Collection Taint** (`for...of` / `for...in`
-loop variables, `.map`-style callback element parameters, and
-`.push`-style mutating calls propagate taint), and **2026-10-14 — Assignment
-Taint** (`&&=` / `||=` target propagation, element-access `+=`, and assignment
-expression results). Assignment-taint behavior and limitations are documented
-in the linked spec and milestone. Known limitation (see spec §11): cross-module
+tsconfig-style import aliases, default `"@/*": ["./*"]`), **2026-09-06 —
+Member JSX Components** (compound tags like `<Card.Header>` and `<Panel.Item>`
+are now treated as client-component boundaries), **2026-09-07 — Re-export
+Traversal** (barrel `export *` / `export { x } from` / `export * as ns` chains
+resolve across files, cycle-safe), **2026-09-13 — Await / Satisfies /
+Shorthand Taint Passthrough** (`await`, `satisfies`, and `{ shorthand }`
+objects are transparent to taint), **2026-09-14 — Iteration / Collection
+Taint** (`for...of` / `for...in` loop variables, `.map`-style callback element
+parameters, and `.push`-style mutating calls propagate taint), **2026-10-14 —
+Assignment Taint** (`&&=` / `||=` target propagation, element-access `+=`, and
+assignment-expression results), **2026-09-17 — Functional Return Taint**
+(return propagation through direct arrow/function IIFEs and inline `.map` /
+`.flatMap` callbacks), **2026-11-04 — Destructuring-Assignment Taint**,
+**2026-11-08 — Computed Object-Key Taint**, and **2026-11-11 —
+Comma-Expression Result Taint**. Known limitation (see spec §11): cross-module
 type-aware dataflow is not yet covered.
 
 Latest milestone: [arithmetic and bitwise expression-result taint](docs/milestones/2026-11-14-arithmetic-bitwise-taint.md) ([specification](docs/specs/arithmetic-bitwise-taint.md)).

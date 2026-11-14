@@ -13,6 +13,7 @@ const MEMBER_JSX = path.join(FIXTURES, "member-jsx");
 const RE_EXPORT = path.join(FIXTURES, "re-export");
 const AWAIT_TAINT = path.join(FIXTURES, "await-taint");
 const ITERATION_TAINT = path.join(FIXTURES, "iteration-taint");
+const FUNCTIONAL_TAINT = path.join(FIXTURES, "functional-taint");
 
 function analyze(dir: string, config = defaultConfig()) {
   const files = collectFiles(dir, config);
@@ -339,7 +340,21 @@ test("mutating collection calls merge argument taint into the receiver", () => {
   );
 });
 
-const ASSIGNMENT_TAINT = path.join(FIXTURES, "assignment-taint");
+test("immediately invoked functions and collection transforms preserve returned taint", () => {
+  const config = defaultConfig();
+  config.sensitiveIdentifiers = [];
+  config.sensitiveMembers = [];
+  const result = analyze(FUNCTIONAL_TAINT, config);
+  const boundary = byRule(result.findings, RULES.CLIENT_BOUNDARY_PROP);
+  for (const line of [13, 14, 15, 16]) {
+    const finding = boundary.find((candidate) => candidate.line === line);
+    assert.ok(finding, `expected a boundary finding on line ${line}: ${JSON.stringify(boundary, null, 2)}`);
+    assert.ok(
+      finding.sources.some((source) => source.includes("process.env.API_SECRET")),
+      JSON.stringify(finding.sources, null, 2),
+    );
+  }
+});const ASSIGNMENT_TAINT = path.join(FIXTURES, "assignment-taint");
 
 function assignmentBoundaries() {
   const config = defaultConfig();
