@@ -373,6 +373,14 @@ test("destructuring assignments propagate taint to each supported target", () =>
   assert.ok(boundary.every((f) => f.file.endsWith("page.tsx")));
 });
 
+test("binding patterns propagate nested defaults and sensitive members to destinations", () => {
+  const { findings } = analyze(path.join(FIXTURES, "binding-pattern-taint"));
+  const boundary = byRule(findings, RULES.CLIENT_BOUNDARY_PROP);
+  assert.deepEqual(boundary.map((f) => [f.line, f.column]).sort((a, b) => a[0] - b[0] || a[1] - b[1]),
+    [[17, 12], [17, 37], ...Array.from({ length: 11 }, (_, i) => [22 + i, 5])]);
+  assert.ok(boundary.every((f) => f.file.endsWith("page.tsx") && f.sources.length > 0));
+});
+
 test("computed object keys propagate taint without flagging public keys", () => {
   const result = analyze(path.join(FIXTURES, "computed-object-keys"));
   const boundary = byRule(result.findings, RULES.CLIENT_BOUNDARY_PROP);

@@ -180,6 +180,23 @@ test("CLI detects destructuring-assignment leaks end-to-end", () => {
   assert.ok(parsed.every((f: { ruleId: string }) => f.ruleId === "rsc/client-boundary-prop"));
 });
 
+test("CLI detects binding-pattern leaks end-to-end", () => {
+  const dir = path.join(FIXTURES, "binding-pattern-taint");
+  let out = "";
+  let code = 0;
+  try {
+    out = execFileSync(process.execPath, [CLI, "scan", dir, "--json"], { encoding: "utf8" });
+  } catch (error) {
+    const failed = error as { status?: number; stdout?: string };
+    code = failed.status ?? -1;
+    out = failed.stdout ?? "";
+  }
+  assert.equal(code, 1);
+  const parsed = JSON.parse(out);
+  assert.equal(parsed.length, 13);
+  assert.ok(parsed.every((f: { ruleId: string }) => f.ruleId === "rsc/client-boundary-prop"));
+});
+
 test("runScan reports computed-object-key leaks end to end", () => {
   const result = runScan([path.join(FIXTURES, "computed-object-keys"), "--json"], process.cwd());
   assert.equal(result.code, 1);

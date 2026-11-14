@@ -98,3 +98,8 @@ Previous milestone: [comma-expression result taint](docs/milestones/2026-11-11-c
 Earlier milestone: [computed object-key taint](docs/milestones/2026-11-08-computed-object-key-taint.md) ([specification](docs/specs/computed-object-key-taint.md)).
 
 Earlier milestone: [destructuring-assignment taint](docs/milestones/2026-11-04-destructuring-assignment-taint.md) ([specification](docs/specs/destructuring-assignment-taint.md)).
+
+Also implemented: [recursive binding-pattern taint](docs/milestones/2026-11-06-binding-pattern-taint.md) ([specification](docs/specs/binding-pattern-taint.md)).
+
+Nested declaration and parameter defaults and sensitive-member reads now propagate
+to leaf destinations, including object/array patterns and rest bindings.

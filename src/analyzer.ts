@@ -794,33 +794,34 @@ class FileWalker {
       }
       return;
     }
-    const isObjectPattern = ts.isObjectBindingPattern(name);
     for (const element of name.elements) {
       if (!ts.isBindingElement(element)) {
         continue;
       }
-      // Object-destructuring reads a member: `const { password } = user`.
-      // Treat the read itself as a sensitive-member source.
-      if (isObjectPattern && element.propertyName && ts.isIdentifier(element.propertyName)) {
-        const memberReason = this.matchesAny(element.propertyName.text, this.memberRE);
-        if (memberReason) {
-          this.addTaint(this.bindingElementKey(element), `read of "user.${memberReason}" (sensitive member)`);
-          continue;
-        }
-      }
-      if (ts.isIdentifier(element.name)) {
-        const nameReason = this.matchesAny(element.name.text, this.identifierRE);
-        if (nameReason) {
-          this.addTaint(element.name.text, `identifier "${nameReason}" (sensitive name)`);
-          continue;
-        }
-      }
-      this.bindNames(element.name, reasons);
+      this.bindNames(element.name, [...reasons, ...this.bindingElementReasons(element)]);
     }
   }
 
-  private bindingElementKey(element: ts.BindingElement): string {
-    return ts.isIdentifier(element.name) ? element.name.text : element.getText(this.analysis.sf);
+  /** Sources introduced by this binding, independently of its incoming value. */
+  private bindingElementReasons(element: ts.BindingElement): string[] {
+    const reasons = element.initializer ? this.taintReasons(element.initializer) : [];
+    // Rest gathers the remaining properties; its destination name is not a read.
+    if (ts.isObjectBindingPattern(element.parent) && !element.dotDotDotToken) {
+      const key = element.propertyName ?? element.name;
+      if (ts.isIdentifier(key) || ts.isStringLiteral(key)) {
+        const member = this.matchesAny(key.text, this.memberRE);
+        if (member) {
+          reasons.push(`read of "user.${member}" (sensitive member)`);
+        }
+      }
+    }
+    if (ts.isIdentifier(element.name)) {
+      const name = this.matchesAny(element.name.text, this.identifierRE);
+      if (name) {
+        reasons.push(`identifier "${name}" (sensitive name)`);
+      }
+    }
+    return reasons;
   }
 
   private describe(node: ts.Node): string {
@@ -1029,12 +1030,9 @@ class FileWalker {
   }
 
   private processBindingElement(node: ts.BindingElement): void {
-    // Default binding-element initializers can smuggle a sensitive value into
-    // a destructured variable.
-    const init = node.initializer;
-    if (init && this.isTainted(init)) {
-      this.addTaint(this.bindingElementKey(node), `default value ${this.describe(init)}`);
-    }
+    // Visit even when the containing value is clean: defaults and member reads
+    // are independent sources, and nested patterns must bind their leaf names.
+    this.bindNames(node.name, this.bindingElementReasons(node));
   }
 
   /** Default parameter values can smuggle a sensitive value into a function. */
