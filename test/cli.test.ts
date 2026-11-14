@@ -186,3 +186,11 @@ test("runScan reports computed-object-key leaks end to end", () => {
   assert.equal(result.findings.length, 8, JSON.stringify(result.findings, null, 2));
   assert.ok(result.findings.every((finding) => finding.ruleId === "rsc/client-boundary-prop"));
 });
+
+test("CLI detects computed-key writes without flagging public writes or reads", () => {
+  const result = runScan([path.join(FIXTURES, "computed-key-writes"), "--json"], process.cwd());
+  assert.equal(result.code, 1);
+  assert.equal(result.findings.length, 19);
+  assert.ok(result.findings.every((finding) =>
+    finding.ruleId === "rsc/client-boundary-prop" && finding.message.includes('prop "data"')));
+});

@@ -69,6 +69,7 @@ CI (`.github/workflows/ci.yml`) runs install, build, test, and lint.
 - Assignment-operator taint (`&&=`, `||=`, `+=` element targets, assignment-expression results): [docs/specs/assignment-taint.md](docs/specs/assignment-taint.md)
 - Comma-expression result taint: [docs/specs/comma-expression-taint.md](docs/specs/comma-expression-taint.md)
 - Computed object-key taint: [docs/specs/computed-object-key-taint.md](docs/specs/computed-object-key-taint.md)
+- Computed-key write taint: [docs/specs/computed-key-write-taint.md](docs/specs/computed-key-write-taint.md)
 - Arithmetic and bitwise expression-result taint: [docs/specs/arithmetic-bitwise-taint.md](docs/specs/arithmetic-bitwise-taint.md)
 - Milestone tracker: [docs/milestones/](docs/milestones/)
 
@@ -94,6 +95,8 @@ type-aware dataflow is not yet covered.
 Latest milestone: [arithmetic and bitwise expression-result taint](docs/milestones/2026-11-14-arithmetic-bitwise-taint.md) ([specification](docs/specs/arithmetic-bitwise-taint.md)).
 
 Previous milestone: [comma-expression result taint](docs/milestones/2026-11-11-comma-expression-taint.md) ([specification](docs/specs/comma-expression-taint.md)).
+
+Earlier milestone: [computed-key write taint](docs/milestones/2026-11-09-computed-key-write-taint.md) ([specification](docs/specs/computed-key-write-taint.md)).
 
 Earlier milestone: [computed object-key taint](docs/milestones/2026-11-08-computed-object-key-taint.md) ([specification](docs/specs/computed-object-key-taint.md)).
 

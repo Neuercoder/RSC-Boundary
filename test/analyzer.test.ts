@@ -385,6 +385,13 @@ test("computed object keys propagate taint without flagging public keys", () => 
     ?.sources.some((source) => source.includes("process.env.INTERNAL_VALUE")));
 });
 
+test("computed-key writes taint receivers for every assignment operator, not reads", () => {
+  const findings = byRule(analyze(path.join(FIXTURES, "computed-key-writes")).findings, RULES.CLIENT_BOUNDARY_PROP);
+  assert.equal(findings.length, 19);
+  assert.ok(findings.every((finding) => finding.message.includes('prop "data"')));
+  assert.ok(findings.every((finding) => finding.sources?.some((source) => source.includes("process.env"))));
+});
+
 test("comma expressions propagate only their final value to boundaries and sinks", () => {
   const config = defaultConfig();
   config.sensitiveIdentifiers = [];
