@@ -429,3 +429,29 @@ test("equality and relational comparisons preserve sensitive operands on either 
   assert.ok(sinks[0].sources.some((source) => source.includes("process.env.INTERNAL_VALUE")));
   assert.equal(result.findings.length, expected.length + 1);
 });
+
+test("arithmetic and bitwise results retain either operand's taint", () => {
+  const config = defaultConfig();
+  config.sensitiveIdentifiers = [];
+  config.sensitiveMembers = [];
+  const result = analyze(path.join(FIXTURES, "arithmetic-bitwise"), config);
+  const boundary = byRule(result.findings, RULES.CLIENT_BOUNDARY_PROP);
+  const operators = [
+    "subtract", "multiply", "divide", "remainder", "power",
+    "leftShift", "rightShift", "unsignedShift", "and", "or", "xor",
+  ];
+  const expected = [
+    ...operators.flatMap((name) => [`${name}Left`, `${name}Right`]),
+    "derived", "nested", "template",
+  ];
+  assert.equal(boundary.length, expected.length, JSON.stringify(result.findings, null, 2));
+  for (const name of expected) {
+    const finding = boundary.find((entry) => entry.message.includes(`prop "${name}"`));
+    assert.ok(finding, name);
+    assert.ok(finding.sources.some((source) => source.includes("process.env.INTERNAL_VALUE")), name);
+  }
+  const sinks = byRule(result.findings, RULES.EXTERNAL_SINK);
+  assert.equal(sinks.length, 1, JSON.stringify(sinks, null, 2));
+  assert.equal(sinks[0].line, 4);
+  assert.ok(sinks[0].sources.some((source) => source.includes("process.env.INTERNAL_VALUE")));
+});
