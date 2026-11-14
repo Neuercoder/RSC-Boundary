@@ -67,6 +67,7 @@ CI (`.github/workflows/ci.yml`) runs install, build, test, and lint.
 - Await / satisfies / shorthand passthrough: [docs/specs/await-satisfies-shorthand.md](docs/specs/await-satisfies-shorthand.md)
 - Iteration / collection taint (`for...of`, `.map` callbacks, `.push` mutation): [docs/specs/iteration-collection-taint.md](docs/specs/iteration-collection-taint.md)
 - Assignment-operator taint (`&&=`, `||=`, `+=` element targets, assignment-expression results): [docs/specs/assignment-taint.md](docs/specs/assignment-taint.md)
+- Destructuring-assignment taint (object/array patterns, rest, defaults): [docs/specs/destructuring-assignment.md](docs/specs/destructuring-assignment.md)
 - Comma-expression result taint: [docs/specs/comma-expression-taint.md](docs/specs/comma-expression-taint.md)
 - Computed object-key taint: [docs/specs/computed-object-key-taint.md](docs/specs/computed-object-key-taint.md)
 - Arithmetic and bitwise expression-result taint: [docs/specs/arithmetic-bitwise-taint.md](docs/specs/arithmetic-bitwise-taint.md)
@@ -87,8 +88,10 @@ from` / `export * as ns` chains resolve across files, cycle-safe), and
 loop variables, `.map`-style callback element parameters, and
 `.push`-style mutating calls propagate taint), and **2026-10-14 — Assignment
 Taint** (`&&=` / `||=` target propagation, element-access `+=`, and assignment
-expression results). Assignment-taint behavior and limitations are documented
-in the linked spec and milestone. Known limitation (see spec §11): cross-module
+expression results), and **2026-10-29 — Destructuring Assignment Taint**
+(object/array assignment patterns with nesting, rest, defaults, and static
+sensitive-member keys). Behavior and limitations are documented in the linked
+specs and milestones. Known limitation (see spec §11): cross-module
 type-aware dataflow is not yet covered.
 
 Latest milestone: [arithmetic and bitwise expression-result taint](docs/milestones/2026-11-14-arithmetic-bitwise-taint.md) ([specification](docs/specs/arithmetic-bitwise-taint.md)).
