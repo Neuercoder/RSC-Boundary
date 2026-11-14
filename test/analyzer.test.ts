@@ -363,6 +363,24 @@ test("assignment expression results propagate taint without tainting clean RHS o
     [21, 22, 23, 24, 25, 26, 27, 28, 29]);
 });
 
+test("tagged templates preserve tainted tags, substitutions, and configured sources", () => {
+  const result = analyze(path.join(FIXTURES, "tagged-template"));
+  const boundary = byRule(result.findings, RULES.CLIENT_BOUNDARY_PROP);
+  assert.equal(boundary.length, 6);
+  for (const prop of ["imported", "aliased", "member", "returned", "interpolated", "source"]) {
+    const finding = boundary.find((item) => item.message.includes(`prop "${prop}"`));
+    assert.ok(finding, `expected finding for ${prop}`);
+    assert.ok(finding.sources.length > 0);
+    if (["imported", "aliased", "member"].includes(prop)) {
+      assert.ok(finding.sources.some((reason) => reason.includes("server module")));
+    }
+    if (["returned", "interpolated"].includes(prop)) {
+      assert.ok(finding.sources.some((reason) => reason.includes("process.env")));
+    }
+  }
+  assert.equal(byRule(result.findings, RULES.EXTERNAL_SINK).length, 1);
+});
+
 test("destructuring assignments propagate taint to each supported target", () => {
   const dir = path.join(FIXTURES, "destructuring-assignment");
   const { findings } = analyze(dir);
