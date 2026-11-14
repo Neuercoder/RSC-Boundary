@@ -406,6 +406,29 @@ test("comma expressions propagate only their final value to boundaries and sinks
   assert.ok(sinks[0].sources.some((source) => source.includes("process.env.INTERNAL_VALUE")));
 });
 
+test("indexed lookups propagate sensitive indices while public lookups stay clean", () => {
+  const config = defaultConfig();
+  config.sensitiveIdentifiers = [];
+  config.sensitiveMembers = [];
+  const result = analyze(path.join(FIXTURES, "indexed-lookup"), config);
+  const boundary = byRule(result.findings, RULES.CLIENT_BOUNDARY_PROP);
+  const expected = ["direct", "array", "optional", "indirect", "assigned", "nested", "template", "receiver", "both"];
+  assert.equal(boundary.length, expected.length, JSON.stringify(result.findings, null, 2));
+  for (const name of expected) {
+    assert.ok(boundary.some((finding) => finding.message.includes(`prop "${name}"`)), name);
+  }
+  for (const name of ["direct", "array", "optional"]) {
+    assert.ok(boundary.find((finding) => finding.message.includes(`prop "${name}"`))
+      ?.sources.some((source) => source.includes("process.env.INTERNAL_VALUE")), name);
+  }
+  assert.deepEqual(boundary.find((finding) => finding.message.includes('prop "both"'))?.sources,
+    ["process.env"]);
+  const sinks = byRule(result.findings, RULES.EXTERNAL_SINK);
+  assert.equal(sinks.length, 1, JSON.stringify(sinks, null, 2));
+  assert.equal(sinks[0].line, 11);
+  assert.ok(sinks[0].sources.some((source) => source.includes("process.env.INTERNAL_VALUE")));
+});
+
 test("arithmetic and bitwise results retain either operand's taint", () => {
   const config = defaultConfig();
   config.sensitiveIdentifiers = [];
