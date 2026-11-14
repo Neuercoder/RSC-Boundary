@@ -114,9 +114,11 @@ loop/callback/mutation wrapper were absent.
   from [await-satisfies-shorthand.md](await-satisfies-shorthand.md)
   applies to the iterated expression); no async-iteration ordering is
   modeled.
-- Mutation modeling is name-based (`push|unshift|add|set|append|insert`)
-  and receiver-identifier-scoped: aliased receivers (`const alias =
-  bucket; alias.push(secret)`) do not propagate back to `bucket`.
+- Mutation modeling is name-based (`push|unshift|add|set|append|insert`).
+  Direct immutable identifier aliases (`const alias = bucket`) are supported
+  by [collection-alias-mutation-taint.md](collection-alias-mutation-taint.md);
+  mutable, property, destructured, function-escaped, and cross-module aliases
+  remain unsupported.
 - Loop/callback bodies inside unexecuted closures use the same
   fixpoint-local reasoning as every other expression — no control-flow
   ordering (e.g. `break`/`continue` sensitivity) is performed.
