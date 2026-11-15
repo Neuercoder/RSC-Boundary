@@ -26,6 +26,23 @@ import * as ts from "typescript";
 
 import { RscBoundaryConfig, Suppression } from "./config";
 
+// These assignments both return a value derived from their operands and
+// update their target. Keep expression evaluation and target tracking aligned.
+const ARITHMETIC_COMPOUND_ASSIGNMENTS = new Set<ts.SyntaxKind>([
+  ts.SyntaxKind.PlusEqualsToken,
+  ts.SyntaxKind.MinusEqualsToken,
+  ts.SyntaxKind.AsteriskEqualsToken,
+  ts.SyntaxKind.SlashEqualsToken,
+  ts.SyntaxKind.PercentEqualsToken,
+  ts.SyntaxKind.AsteriskAsteriskEqualsToken,
+  ts.SyntaxKind.LessThanLessThanEqualsToken,
+  ts.SyntaxKind.GreaterThanGreaterThanEqualsToken,
+  ts.SyntaxKind.GreaterThanGreaterThanGreaterThanEqualsToken,
+  ts.SyntaxKind.AmpersandEqualsToken,
+  ts.SyntaxKind.BarEqualsToken,
+  ts.SyntaxKind.CaretEqualsToken,
+]);
+
 export interface Finding {
   file: string;
   line: number;
@@ -1117,7 +1134,7 @@ class FileWalker {
       }
       return;
     }
-    if (token === ts.SyntaxKind.PlusEqualsToken) {
+    if (ARITHMETIC_COMPOUND_ASSIGNMENTS.has(token)) {
       const lhs = node.left;
       if (
         (ts.isIdentifier(lhs) || ts.isPropertyAccessExpression(lhs) || ts.isElementAccessExpression(lhs)) &&
@@ -2106,7 +2123,7 @@ class FileWalker {
           op === ts.SyntaxKind.QuestionQuestionToken ||
           op === ts.SyntaxKind.AmpersandAmpersandToken ||
           op === ts.SyntaxKind.BarBarToken ||
-          op === ts.SyntaxKind.PlusEqualsToken ||
+          ARITHMETIC_COMPOUND_ASSIGNMENTS.has(op) ||
           op === ts.SyntaxKind.QuestionQuestionEqualsToken ||
           op === ts.SyntaxKind.AmpersandAmpersandEqualsToken ||
           op === ts.SyntaxKind.BarBarEqualsToken
