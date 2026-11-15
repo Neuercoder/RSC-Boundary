@@ -459,3 +459,28 @@ test("arithmetic and bitwise results retain either operand's taint", () => {
   assert.equal(sinks[0].line, 4);
   assert.ok(sinks[0].sources.some((source) => source.includes("process.env.INTERNAL_VALUE")));
 });
+
+test("compound arithmetic and bitwise assignments taint results and updated targets", () => {
+  const config = defaultConfig();
+  config.sensitiveIdentifiers = [];
+  config.sensitiveMembers = [];
+  const result = analyze(path.join(FIXTURES, "compound-arithmetic"), config);
+  const boundary = byRule(result.findings, RULES.CLIENT_BOUNDARY_PROP);
+  const operators = [
+    "add", "subtract", "multiply", "divide", "remainder", "power",
+    "leftShift", "rightShift", "unsignedShift", "and", "or", "xor",
+  ];
+  const expected = [
+    ...operators.flatMap((name) => [`${name}Stored`, `${name}Left`, `${name}Right`]),
+    "property", "element", "nested",
+  ];
+  assert.deepEqual(boundary.map((finding) =>
+    /prop "([^"]+)"/.exec(finding.message)?.[1]).sort(), expected.sort());
+  for (const name of operators) {
+    assert.ok(boundary.find((finding) => finding.message.includes(`prop "${name}Right"`))
+      ?.sources.some((source) => source.includes("process.env.INTERNAL_VALUE")), name);
+  }
+  const sinks = byRule(result.findings, RULES.EXTERNAL_SINK);
+  assert.equal(sinks.length, 1, JSON.stringify(sinks, null, 2));
+  assert.ok(sinks[0].sources.some((source) => source.includes("process.env.INTERNAL_VALUE")));
+});
