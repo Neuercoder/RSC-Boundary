@@ -2068,16 +2068,17 @@ class FileWalker {
           return [`tagged template ${tagText} (data source)`];
         }
         const template = tagged.template;
-        if (ts.isNoSubstitutionTemplateLiteral(template)) {
-          return [];
-        }
-        for (const span of template.templateSpans) {
-          const reasons = this.taintReasonsWorker(span.expression, depth + 1);
-          if (reasons.length > 0) {
-            return reasons.slice(0, 3);
+        if (ts.isTemplateExpression(template)) {
+          for (const span of template.templateSpans) {
+            const reasons = this.taintReasonsWorker(span.expression, depth + 1);
+            if (reasons.length > 0) {
+              return reasons.slice(0, 3);
+            }
           }
         }
-        return [];
+        // Tags are callees too: a server binding or a function returning
+        // sensitive data taints the result even without interpolations.
+        return this.taintReasonsWorker(tagged.tag, depth + 1);
       }
       case ts.SyntaxKind.TemplateExpression: {
         const template = node as ts.TemplateExpression;

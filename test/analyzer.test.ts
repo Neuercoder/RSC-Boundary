@@ -456,3 +456,25 @@ test("compound arithmetic and bitwise assignments taint results and updated targ
   assert.equal(sinks.length, 1, JSON.stringify(sinks, null, 2));
   assert.ok(sinks[0].sources.some((source) => source.includes("process.env.INTERNAL_VALUE")));
 });
+
+test("tagged template results inherit tag function taint without sensitive-name heuristics", () => {
+  const config = defaultConfig();
+  config.sensitiveIdentifiers = [];
+  config.sensitiveMembers = [];
+  const { findings } = analyze(path.join(FIXTURES, "tagged-callee"), config);
+  const boundary = byRule(findings, RULES.CLIENT_BOUNDARY_PROP);
+  const expected = ["imported", "interpolated", "local", "member", "element", "stored", "nested", "interpolation", "configured"];
+  assert.equal(boundary.length, expected.length);
+  for (const prop of expected) {
+    assert.ok(boundary.some((finding) => finding.message.includes(`prop "${prop}"`)), `missing ${prop}`);
+  }
+  const imported = boundary.find((finding) => finding.message.includes('prop "imported"'));
+  assert.ok(imported?.sources?.some((source) => source.includes("@/server/render")));
+  const local = boundary.find((finding) => finding.message.includes('prop "local"'));
+  assert.ok(local?.sources?.some((source) => source.includes("process.env")));
+  const configured = boundary.find((finding) => finding.message.includes('prop "configured"'));
+  assert.ok(configured?.sources?.some((source) => source.includes("tagged template sql (data source)")));
+  const external = byRule(findings, RULES.EXTERNAL_SINK);
+  assert.equal(external.length, 1);
+  assert.ok(external[0].sources?.some((source) => source.includes("@/server/render")));
+});

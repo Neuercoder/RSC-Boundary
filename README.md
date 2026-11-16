@@ -71,6 +71,7 @@ CI (`.github/workflows/ci.yml`) runs install, build, test, and lint.
 - Computed object-key taint: [docs/specs/computed-object-key-taint.md](docs/specs/computed-object-key-taint.md)
 - Arithmetic and bitwise expression-result taint: [docs/specs/arithmetic-bitwise-taint.md](docs/specs/arithmetic-bitwise-taint.md)
 - Arithmetic and bitwise compound assignments: [docs/specs/compound-arithmetic-taint.md](docs/specs/compound-arithmetic-taint.md)
+- Tagged-template callee taint: [docs/specs/tagged-template-callee-taint.md](docs/specs/tagged-template-callee-taint.md)
 - Milestone tracker: [docs/milestones/](docs/milestones/)
 
 ## Current status
@@ -92,9 +93,11 @@ expression results). Assignment-taint behavior and limitations are documented
 in the linked spec and milestone. Known limitation (see spec §11): cross-module
 type-aware dataflow is not yet covered.
 
-Latest milestone: [arithmetic and bitwise compound-assignment taint](docs/milestones/2026-11-15-compound-arithmetic-taint.md) ([specification](docs/specs/compound-arithmetic-taint.md)).
+Latest milestone: [tagged-template callee taint](docs/milestones/2026-11-16-tagged-template-callee-taint.md) ([specification](docs/specs/tagged-template-callee-taint.md)).
 
-Previous milestone: [arithmetic and bitwise expression-result taint](docs/milestones/2026-11-14-arithmetic-bitwise-taint.md) ([specification](docs/specs/arithmetic-bitwise-taint.md)).
+Previous milestone: [arithmetic and bitwise compound-assignment taint](docs/milestones/2026-11-15-compound-arithmetic-taint.md) ([specification](docs/specs/compound-arithmetic-taint.md)).
+
+Earlier milestone: [arithmetic and bitwise expression-result taint](docs/milestones/2026-11-14-arithmetic-bitwise-taint.md) ([specification](docs/specs/arithmetic-bitwise-taint.md)).
 
 Earlier milestone: [comma-expression result taint](docs/milestones/2026-11-11-comma-expression-taint.md) ([specification](docs/specs/comma-expression-taint.md)).
 
