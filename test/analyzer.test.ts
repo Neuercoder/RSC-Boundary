@@ -478,3 +478,28 @@ test("tagged template results inherit tag function taint without sensitive-name 
   assert.equal(external.length, 1);
   assert.ok(external[0].sources?.some((source) => source.includes("@/server/render")));
 });
+
+test("object methods and getters propagate sensitive returns without name heuristics", () => {
+  const config = defaultConfig();
+  config.sensitiveIdentifiers = [];
+  config.sensitiveMembers = [];
+  const { findings } = analyze(path.join(FIXTURES, "object-callable"), config);
+  const boundary = byRule(findings, RULES.CLIENT_BOUNDARY_PROP);
+  const expected = ["method", "getter", "asyncMethod", "nested", "stored", "inline", "element"];
+  assert.equal(boundary.length, expected.length);
+  for (const prop of expected) {
+    const finding = boundary.find((item) => item.message.includes(`prop "${prop}"`));
+    assert.ok(finding, `missing ${prop}`);
+    assert.ok(finding.sources.length > 0, `missing provenance for ${prop}`);
+  }
+  const element = boundary.find((finding) => finding.message.includes('prop "element"'));
+  assert.ok(element?.sources.some((source) => source.includes("process.env.INTERNAL_VALUE")));
+  const sinks = byRule(findings, RULES.EXTERNAL_SINK);
+  assert.equal(sinks.length, 1);
+  assert.ok(sinks[0].sources.some((source) => source.includes("methods.read")));
+  const exports = byRule(findings, RULES.SERVER_ONLY_EXPORT);
+  assert.equal(exports.length, 2);
+  for (const finding of exports) {
+    assert.ok(finding.sources.some((source) => source.includes("process.env.INTERNAL_VALUE")));
+  }
+});

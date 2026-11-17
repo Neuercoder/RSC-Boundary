@@ -2178,6 +2178,13 @@ class FileWalker {
             if (reasons.length > 0) {
               return reasons.slice(0, 3);
             }
+          } else if (ts.isMethodDeclaration(prop) || ts.isGetAccessorDeclaration(prop)) {
+            // Object callables expose their returned data just like named
+            // functions. Reuse the return scan so nested functions stay isolated.
+            const reasons = this.functionReturnsTainted(prop);
+            if (reasons) {
+              return reasons.slice(0, 3);
+            }
           } else if (ts.isSpreadAssignment(prop)) {
             const reasons = this.taintReasonsWorker(prop.expression, depth + 1);
             if (reasons.length > 0) {
