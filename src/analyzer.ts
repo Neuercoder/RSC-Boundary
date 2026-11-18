@@ -1019,8 +1019,12 @@ class FileWalker {
     }
   }
 
-  /** First tainted return expression found in `fn`'s body (skipping nested functions). */
+  /** First tainted explicit or concise return (skipping nested functions). */
   private functionReturnsTainted(fn: ts.FunctionLikeDeclaration): string[] | null {
+    if (ts.isArrowFunction(fn) && !ts.isBlock(fn.body)) {
+      const reasons = this.taintReasons(fn.body);
+      return reasons.length > 0 ? reasons.slice(0, 3) : null;
+    }
     let result: string[] | null = null;
     const visit = (node: ts.Node): void => {
       if (ts.isReturnStatement(node)) {

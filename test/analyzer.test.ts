@@ -503,3 +503,26 @@ test("object methods and getters propagate sensitive returns without name heuris
     assert.ok(finding.sources.some((source) => source.includes("process.env.INTERNAL_VALUE")));
   }
 });
+
+test("concise arrow functions propagate sensitive returns without name heuristics", () => {
+  const config = defaultConfig();
+  config.sensitiveIdentifiers = [];
+  config.sensitiveMembers = [];
+  const { findings } = analyze(path.join(FIXTURES, "concise-arrow"), config);
+  const boundary = byRule(findings, RULES.CLIENT_BOUNDARY_PROP);
+  const expected = ["direct", "asyncResult", "wrapped", "derived", "objectResult", "alias", "stored", "callable"];
+  assert.equal(boundary.length, expected.length);
+  for (const prop of expected) {
+    const finding = boundary.find((item) => item.message.includes(`prop "${prop}"`));
+    assert.ok(finding, `missing ${prop}`);
+    assert.ok(finding.sources.some((source) => source.includes("process.env")));
+  }
+  const sinks = byRule(findings, RULES.EXTERNAL_SINK);
+  assert.equal(sinks.length, 1);
+  assert.ok(sinks[0].sources.some((source) => source.includes("process.env")));
+  const exports = byRule(findings, RULES.SERVER_ONLY_EXPORT);
+  assert.equal(exports.length, 2);
+  for (const finding of exports) {
+    assert.ok(finding.sources.some((source) => source.includes("process.env")));
+  }
+});
