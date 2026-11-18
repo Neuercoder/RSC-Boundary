@@ -26,6 +26,23 @@ import * as ts from "typescript";
 
 import { RscBoundaryConfig, Suppression } from "./config";
 
+// These assignments both return a value derived from their operands and
+// update their target. Keep expression evaluation and target tracking aligned.
+const ARITHMETIC_COMPOUND_ASSIGNMENTS = new Set<ts.SyntaxKind>([
+  ts.SyntaxKind.PlusEqualsToken,
+  ts.SyntaxKind.MinusEqualsToken,
+  ts.SyntaxKind.AsteriskEqualsToken,
+  ts.SyntaxKind.SlashEqualsToken,
+  ts.SyntaxKind.PercentEqualsToken,
+  ts.SyntaxKind.AsteriskAsteriskEqualsToken,
+  ts.SyntaxKind.LessThanLessThanEqualsToken,
+  ts.SyntaxKind.GreaterThanGreaterThanEqualsToken,
+  ts.SyntaxKind.GreaterThanGreaterThanGreaterThanEqualsToken,
+  ts.SyntaxKind.AmpersandEqualsToken,
+  ts.SyntaxKind.BarEqualsToken,
+  ts.SyntaxKind.CaretEqualsToken,
+]);
+
 export interface Finding {
   file: string;
   line: number;
@@ -1049,8 +1066,12 @@ class FileWalker {
     );
   }
 
-  /** First tainted return expression found in `fn`'s body (skipping nested functions). */
+  /** First tainted explicit or concise return (skipping nested functions). */
   private functionReturnsTainted(fn: ts.FunctionLikeDeclaration): string[] | null {
+    if (ts.isArrowFunction(fn) && !ts.isBlock(fn.body)) {
+      const reasons = this.taintReasons(fn.body);
+      return reasons.length > 0 ? reasons.slice(0, 3) : null;
+    }
     let result: string[] | null = null;
     const visit = (node: ts.Node): void => {
       if (ts.isReturnStatement(node)) {
@@ -1164,7 +1185,7 @@ class FileWalker {
       }
       return;
     }
-    if (token === ts.SyntaxKind.PlusEqualsToken) {
+    if (ARITHMETIC_COMPOUND_ASSIGNMENTS.has(token)) {
       const lhs = node.left;
       if (
         (ts.isIdentifier(lhs) || ts.isPropertyAccessExpression(lhs) || ts.isElementAccessExpression(lhs)) &&
@@ -2108,16 +2129,17 @@ class FileWalker {
           return [`tagged template ${tagText} (data source)`];
         }
         const template = tagged.template;
-        if (ts.isNoSubstitutionTemplateLiteral(template)) {
-          return [];
-        }
-        for (const span of template.templateSpans) {
-          const reasons = this.taintReasonsWorker(span.expression, depth + 1);
-          if (reasons.length > 0) {
-            return reasons.slice(0, 3);
+        if (ts.isTemplateExpression(template)) {
+          for (const span of template.templateSpans) {
+            const reasons = this.taintReasonsWorker(span.expression, depth + 1);
+            if (reasons.length > 0) {
+              return reasons.slice(0, 3);
+            }
           }
         }
-        return [];
+        // Tags are callees too: a server binding or a function returning
+        // sensitive data taints the result even without interpolations.
+        return this.taintReasonsWorker(tagged.tag, depth + 1);
       }
       case ts.SyntaxKind.TemplateExpression: {
         const template = node as ts.TemplateExpression;
@@ -2132,16 +2154,28 @@ class FileWalker {
       case ts.SyntaxKind.BinaryExpression: {
         const binary = node as ts.BinaryExpression;
         const op = binary.operatorToken.kind;
-        // Plain assignment evaluates to the RHS, not the target's old value.
-        if (op === ts.SyntaxKind.EqualsToken) {
+        // Assignment and comma expressions evaluate to the RHS, not the
+        // target's old value or the discarded left operand.
+        if (op === ts.SyntaxKind.EqualsToken || op === ts.SyntaxKind.CommaToken) {
           return this.taintReasonsWorker(binary.right, depth + 1);
         }
         if (
           op === ts.SyntaxKind.PlusToken ||
+          op === ts.SyntaxKind.MinusToken ||
+          op === ts.SyntaxKind.AsteriskToken ||
+          op === ts.SyntaxKind.SlashToken ||
+          op === ts.SyntaxKind.PercentToken ||
+          op === ts.SyntaxKind.AsteriskAsteriskToken ||
+          op === ts.SyntaxKind.LessThanLessThanToken ||
+          op === ts.SyntaxKind.GreaterThanGreaterThanToken ||
+          op === ts.SyntaxKind.GreaterThanGreaterThanGreaterThanToken ||
+          op === ts.SyntaxKind.AmpersandToken ||
+          op === ts.SyntaxKind.BarToken ||
+          op === ts.SyntaxKind.CaretToken ||
           op === ts.SyntaxKind.QuestionQuestionToken ||
           op === ts.SyntaxKind.AmpersandAmpersandToken ||
           op === ts.SyntaxKind.BarBarToken ||
-          op === ts.SyntaxKind.PlusEqualsToken ||
+          ARITHMETIC_COMPOUND_ASSIGNMENTS.has(op) ||
           op === ts.SyntaxKind.QuestionQuestionEqualsToken ||
           op === ts.SyntaxKind.AmpersandAmpersandEqualsToken ||
           op === ts.SyntaxKind.BarBarEqualsToken
@@ -2192,9 +2226,24 @@ class FileWalker {
       case ts.SyntaxKind.ObjectLiteralExpression: {
         const object = node as ts.ObjectLiteralExpression;
         for (const prop of object.properties) {
+          // Computed keys are observable data too, even when their values
+          // (or method/accessor bodies) are public.
+          if (prop.name && ts.isComputedPropertyName(prop.name)) {
+            const reasons = this.taintReasonsWorker(prop.name.expression, depth + 1);
+            if (reasons.length > 0) {
+              return reasons.slice(0, 3);
+            }
+          }
           if (ts.isPropertyAssignment(prop)) {
             const reasons = this.taintReasonsWorker(prop.initializer, depth + 1);
             if (reasons.length > 0) {
+              return reasons.slice(0, 3);
+            }
+          } else if (ts.isMethodDeclaration(prop) || ts.isGetAccessorDeclaration(prop)) {
+            // Object callables expose their returned data just like named
+            // functions. Reuse the return scan so nested functions stay isolated.
+            const reasons = this.functionReturnsTainted(prop);
+            if (reasons) {
               return reasons.slice(0, 3);
             }
           } else if (ts.isSpreadAssignment(prop)) {
