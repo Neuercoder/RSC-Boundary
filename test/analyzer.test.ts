@@ -526,3 +526,29 @@ test("concise arrow functions propagate sensitive returns without name heuristic
     assert.ok(finding.sources.some((source) => source.includes("process.env")));
   }
 });
+
+test("function-valued object properties propagate return taint without scanning nested returns", () => {
+  const config = defaultConfig();
+  config.sensitiveIdentifiers = [];
+  config.sensitiveMembers = [];
+  const result = analyze(path.join(FIXTURES, "property-callable"), config);
+  const boundary = byRule(result.findings, RULES.CLIENT_BOUNDARY_PROP);
+  const expected = ["concise", "block", "ordinary", "asyncResult", "wrapped", "nested",
+    "element", "stored", "callable", "inline"];
+  assert.equal(boundary.length, expected.length, JSON.stringify(boundary, null, 2));
+  for (const prop of expected) {
+    assert.ok(boundary.some((finding) => finding.message.includes(`prop "${prop}"`)), prop);
+  }
+  const sinks = byRule(result.findings, RULES.EXTERNAL_SINK);
+  assert.equal(sinks.length, 1, JSON.stringify(sinks, null, 2));
+  const exports = byRule(result.findings, RULES.SERVER_ONLY_EXPORT);
+  assert.equal(exports.length, 2, JSON.stringify(exports, null, 2));
+  for (const finding of [...boundary, ...sinks, ...exports]) {
+    assert.ok(finding.sources.length > 0, JSON.stringify(finding, null, 2));
+  }
+  const element = boundary.find((finding) => finding.message.includes('prop "element"'));
+  assert.ok(element?.sources.some((source) => source.includes("process.env.INTERNAL_VALUE")));
+  for (const finding of exports) {
+    assert.ok(finding.sources.some((source) => source.includes("process.env.INTERNAL_VALUE")));
+  }
+});
