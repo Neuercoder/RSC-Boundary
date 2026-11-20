@@ -174,7 +174,9 @@ model (`loadConfig`, `defaultConfig`, `mergeConfig`).
   [iteration-collection-taint.md](iteration-collection-taint.md) — and
   async/assignment-operator flow (`await`/`yield`, `||=`/`&&=`,
   `satisfies`) is supported — see
-  [async-assignment-flow.md](async-assignment-flow.md).
+  [async-assignment-flow.md](async-assignment-flow.md). Direct
+  IIFEs and inline `map` / `flatMap` callback returns also preserve taint —
+  see [functional-return-taint.md](functional-return-taint.md).
 - Data sources are matched by name/call patterns, not by full type-aware
   dataflow across modules; false positives are expected and suppressible.
 - Assignment tracking remains monotonic within the existing fixpoint: control-flow
