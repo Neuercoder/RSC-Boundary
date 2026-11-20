@@ -170,9 +170,11 @@ model (`loadConfig`, `defaultConfig`, `mergeConfig`).
   are loop iteration (`for...of` / `for...in`), collection-callback element
   parameters (`rows.map((entry) => …)`), mutating collection calls
   (`bucket.push(secret)`) — see
-  [iteration-collection-taint.md](iteration-collection-taint.md) — and
-  static-key bracket reads (`user["password"]`,
-  `` vault[`password`] ``) — see [element-access-taint.md](element-access-taint.md).
+  [iteration-collection-taint.md](iteration-collection-taint.md) — static-key
+  bracket reads (`user["password"]`, `` vault[`password`] ``) — see
+  [element-access-taint.md](element-access-taint.md) — and direct IIFEs plus
+  inline `map` / `flatMap` callback returns — see
+  [functional-return-taint.md](functional-return-taint.md).
 - Data sources are matched by name/call patterns, not by full type-aware
   dataflow across modules; false positives are expected and suppressible.
 - Assignment tracking remains monotonic within the existing fixpoint: control-flow

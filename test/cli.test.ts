@@ -15,6 +15,7 @@ const RE_EXPORT = path.join(FIXTURES, "re-export");
 const AWAIT_TAINT = path.join(FIXTURES, "await-taint");
 const ITERATION_TAINT = path.join(FIXTURES, "iteration-taint");
 const ELEMENT_TAINT = path.join(FIXTURES, "element-access-taint");
+const FUNCTIONAL_TAINT = path.join(FIXTURES, "functional-taint");
 const CLI = path.resolve(__dirname, "..", "..", "dist", "cli.js");
 
 test("runScan reports findings and exit code 1 for a leaking fixture", () => {
@@ -188,4 +189,11 @@ test("CLI detects destructuring-assignment leaks end-to-end", () => {
   const parsed = JSON.parse(out);
   assert.equal(parsed.length, 15);
   assert.ok(parsed.every((f: { ruleId: string }) => f.ruleId === "rsc/client-boundary-prop"));
+});
+
+test("runScan flags immediately invoked function and collection-transform leaks", () => {
+  const result = runScan([FUNCTIONAL_TAINT, "--json"], process.cwd());
+  assert.equal(result.code, 1);
+  const boundary = result.findings.filter((finding) => finding.ruleId === "rsc/client-boundary-prop");
+  assert.equal(boundary.length, 11, JSON.stringify(result.findings, null, 2));
 });

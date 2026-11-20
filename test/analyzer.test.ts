@@ -14,6 +14,7 @@ const RE_EXPORT = path.join(FIXTURES, "re-export");
 const AWAIT_TAINT = path.join(FIXTURES, "await-taint");
 const ITERATION_TAINT = path.join(FIXTURES, "iteration-taint");
 const ELEMENT_TAINT = path.join(FIXTURES, "element-access-taint");
+const FUNCTIONAL_TAINT = path.join(FIXTURES, "functional-taint");
 
 function analyze(dir: string, config = defaultConfig()) {
   const files = collectFiles(dir, config);
@@ -417,4 +418,24 @@ test("destructuring assignments propagate taint to each supported target", () =>
   assert.deepEqual(boundary.map((f) => f.line).sort((a, b) => a - b),
     Array.from({ length: 15 }, (_, i) => 26 + i));
   assert.ok(boundary.every((f) => f.file.endsWith("page.tsx")));
+});
+
+test("immediately invoked functions and collection transforms preserve returned taint", () => {
+  const config = defaultConfig();
+  config.sensitiveIdentifiers = [];
+  config.sensitiveMembers = [];
+  const result = analyze(FUNCTIONAL_TAINT, config);
+  const boundary = byRule(result.findings, RULES.CLIENT_BOUNDARY_PROP);
+  const expected = ["direct", "block", "ordinary", "wrapped", "asyncResult", "nested", "mapped", "flattened", "functionMap", "withThis", "stored"];
+  assert.equal(boundary.length, expected.length);
+  for (const prop of expected) {
+    const finding = boundary.find((item) => item.message.includes(`prop "${prop}"`));
+    assert.ok(finding, `missing ${prop}`);
+    assert.ok(finding.sources.some((source) => source.includes("process.env.API_SECRET")));
+  }
+  for (const rule of [RULES.EXTERNAL_SINK, RULES.SERVER_ONLY_EXPORT]) {
+    const matches = byRule(result.findings, rule);
+    assert.equal(matches.length, 1);
+    assert.ok(matches[0].sources.some((source) => source.includes("process.env.API_SECRET")));
+  }
 });
