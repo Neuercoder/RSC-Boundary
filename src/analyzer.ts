@@ -1020,16 +1020,18 @@ class FileWalker {
   }
 
   /** First tainted explicit or concise return (skipping nested functions). */
-  private functionReturnsTainted(fn: ts.FunctionLikeDeclaration): string[] | null {
+  private functionReturnsTainted(fn: ts.FunctionLikeDeclaration, depth = 0): string[] | null {
+    // Expression-bodied arrows have no ReturnStatement node, but their body
+    // is still the value returned at every call site.
     if (ts.isArrowFunction(fn) && !ts.isBlock(fn.body)) {
-      const reasons = this.taintReasons(fn.body);
+      const reasons = this.taintReasonsWorker(fn.body, depth + 1);
       return reasons.length > 0 ? reasons.slice(0, 3) : null;
     }
     let result: string[] | null = null;
     const visit = (node: ts.Node): void => {
       if (ts.isReturnStatement(node)) {
         if (node.expression) {
-          const reasons = this.taintReasons(node.expression);
+          const reasons = this.taintReasonsWorker(node.expression, depth + 1);
           if (reasons.length > 0) {
             result = result ?? reasons.slice(0, 3);
           }
@@ -1503,7 +1505,7 @@ class FileWalker {
     if (call.arguments.length === 0) {
       return;
     }
-    const callback = call.arguments[call.arguments.length - 1];
+    const callback = call.arguments[0];
     if (!ts.isArrowFunction(callback) && !ts.isFunctionExpression(callback)) {
       return;
     }
@@ -1515,6 +1517,31 @@ class FileWalker {
       return;
     }
     this.bindNames(callback.parameters[0].name, receiverReasons);
+  }
+
+  /**
+   * Taint-producing call shapes whose result is determined by an inline
+   * function body: immediately invoked functions and collection transforms
+   * (`map` / `flatMap`). A callback to another method is not assumed to feed
+   * its return value into the result (for example, `forEach`).
+   */
+  private inlineFunctionResultReasons(call: ts.CallExpression, depth: number): string[] {
+    let callee: ts.Expression = call.expression;
+    while (ts.isParenthesizedExpression(callee)) {
+      callee = callee.expression;
+    }
+    if (ts.isArrowFunction(callee) || ts.isFunctionExpression(callee)) {
+      return this.functionReturnsTainted(callee, depth) ?? [];
+    }
+    if (!ts.isPropertyAccessExpression(callee) || !/^(map|flatMap)$/.test(callee.name.text)) {
+      return [];
+    }
+    const callback = call.arguments[0];
+    if (!callback || (!ts.isArrowFunction(callback) && !ts.isFunctionExpression(callback))) {
+      return [];
+    }
+    const reasons = this.functionReturnsTainted(callback, depth);
+    return reasons ? [`result of call ${this.describe(call)}`, ...reasons].slice(0, 3) : [];
   }
 
   /**
@@ -2040,6 +2067,12 @@ class FileWalker {
       case ts.SyntaxKind.NewExpression: {
         const call = node as ts.CallExpression | ts.NewExpression;
         this.bindCallbackParameters(call);
+        if (ts.isCallExpression(call)) {
+          const inlineResultReasons = this.inlineFunctionResultReasons(call, depth);
+          if (inlineResultReasons.length > 0) {
+            return inlineResultReasons.slice(0, 3);
+          }
+        }
         for (const arg of call.arguments ?? []) {
           const argReasons = this.taintReasonsWorker(arg, depth + 1);
           if (argReasons.length > 0) {
