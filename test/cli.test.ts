@@ -14,6 +14,7 @@ const MEMBER_JSX = path.join(FIXTURES, "member-jsx");
 const RE_EXPORT = path.join(FIXTURES, "re-export");
 const AWAIT_TAINT = path.join(FIXTURES, "await-taint");
 const ITERATION_TAINT = path.join(FIXTURES, "iteration-taint");
+const ASYNC_AWAIT = path.join(FIXTURES, "async-await");
 const FUNCTIONAL_TAINT = path.join(FIXTURES, "functional-taint");
 const CLI = path.resolve(__dirname, "..", "..", "dist", "cli.js");
 
@@ -155,6 +156,18 @@ test("runScan flags iteration/collection leaks end to end", () => {
     (finding) => finding.ruleId === "rsc/client-boundary-prop",
   );
   assert.equal(boundary.length, 4, JSON.stringify(result.findings, null, 2));
+});
+
+test("runScan flags awaited taint flowing into a client boundary", () => {
+  const result = runScan([ASYNC_AWAIT, "--json"], process.cwd());
+  assert.equal(result.code, 1);
+  const boundary = result.findings.filter(
+    (finding) => finding.ruleId === "rsc/client-boundary-prop",
+  );
+  assert.ok(
+    boundary.some((finding) => finding.message.includes('prop "title"')),
+    JSON.stringify(boundary, null, 2),
+  );
 });
 
 test("runScan flags immediately invoked function and collection-transform leaks", () => {
