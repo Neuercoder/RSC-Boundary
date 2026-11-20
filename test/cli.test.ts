@@ -14,7 +14,11 @@ const MEMBER_JSX = path.join(FIXTURES, "member-jsx");
 const RE_EXPORT = path.join(FIXTURES, "re-export");
 const AWAIT_TAINT = path.join(FIXTURES, "await-taint");
 const ITERATION_TAINT = path.join(FIXTURES, "iteration-taint");
+<<<<<<< HEAD
 const COLLECTION_ALIAS_TAINT = path.join(FIXTURES, "collection-alias-taint");
+=======
+const FUNCTIONAL_TAINT = path.join(FIXTURES, "functional-taint");
+>>>>>>> origin/main
 const CLI = path.resolve(__dirname, "..", "..", "dist", "cli.js");
 
 test("runScan reports findings and exit code 1 for a leaking fixture", () => {
@@ -157,11 +161,19 @@ test("runScan flags iteration/collection leaks end to end", () => {
   assert.equal(boundary.length, 4, JSON.stringify(result.findings, null, 2));
 });
 
+<<<<<<< HEAD
 test("runScan flags direct immutable collection-alias mutation leaks", () => {
   const result = runScan([COLLECTION_ALIAS_TAINT, "--json"], process.cwd());
   assert.equal(result.code, 1);
   const boundary = result.findings.filter((finding) => finding.ruleId === "rsc/client-boundary-prop");
   assert.equal(boundary.length, 3, JSON.stringify(result.findings, null, 2));
+=======
+test("runScan flags immediately invoked function and collection-transform leaks", () => {
+  const result = runScan([FUNCTIONAL_TAINT, "--json"], process.cwd());
+  assert.equal(result.code, 1);
+  const boundary = result.findings.filter((finding) => finding.ruleId === "rsc/client-boundary-prop");
+  assert.equal(boundary.length, 11, JSON.stringify(result.findings, null, 2));
+>>>>>>> origin/main
 });
 
 test("runScan reports assignment leaks end to end", () => {
@@ -169,4 +181,28 @@ test("runScan reports assignment leaks end to end", () => {
   assert.equal(result.code, 1);
   const boundary = result.findings.filter((finding) => finding.ruleId === "rsc/client-boundary-prop");
   assert.equal(boundary.length, 9, JSON.stringify(result.findings, null, 2));
+});
+
+test("CLI detects destructuring-assignment leaks end-to-end", () => {
+  const dir = path.join(FIXTURES, "destructuring-assignment");
+  let out = "";
+  let code = 0;
+  try {
+    out = execFileSync(process.execPath, [CLI, "scan", dir, "--json"], { encoding: "utf8" });
+  } catch (error) {
+    const failed = error as { status?: number; stdout?: string };
+    code = failed.status ?? -1;
+    out = failed.stdout ?? "";
+  }
+  assert.equal(code, 1);
+  const parsed = JSON.parse(out);
+  assert.equal(parsed.length, 15);
+  assert.ok(parsed.every((f: { ruleId: string }) => f.ruleId === "rsc/client-boundary-prop"));
+});
+
+test("runScan reports computed-object-key leaks end to end", () => {
+  const result = runScan([path.join(FIXTURES, "computed-object-keys"), "--json"], process.cwd());
+  assert.equal(result.code, 1);
+  assert.equal(result.findings.length, 8, JSON.stringify(result.findings, null, 2));
+  assert.ok(result.findings.every((finding) => finding.ruleId === "rsc/client-boundary-prop"));
 });
