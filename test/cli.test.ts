@@ -161,7 +161,7 @@ test("runScan flags immediately invoked function and collection-transform leaks"
   const result = runScan([FUNCTIONAL_TAINT, "--json"], process.cwd());
   assert.equal(result.code, 1);
   const boundary = result.findings.filter((finding) => finding.ruleId === "rsc/client-boundary-prop");
-  assert.equal(boundary.length, 4, JSON.stringify(result.findings, null, 2));
+  assert.equal(boundary.length, 11, JSON.stringify(result.findings, null, 2));
 });
 
 test("runScan reports assignment leaks end to end", () => {

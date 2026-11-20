@@ -24,3 +24,4 @@ No control-flow feasibility is modeled, and clean overwrites do not clear taint.
 - Regression evidence: before the fix, the new CLI test expected nine findings but observed one.
 
 `npm test` includes the strict TypeScript build and test compilation.
+

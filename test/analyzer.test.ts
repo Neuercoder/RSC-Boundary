@@ -346,15 +346,21 @@ test("immediately invoked functions and collection transforms preserve returned 
   config.sensitiveMembers = [];
   const result = analyze(FUNCTIONAL_TAINT, config);
   const boundary = byRule(result.findings, RULES.CLIENT_BOUNDARY_PROP);
-  for (const line of [13, 14, 15, 16]) {
-    const finding = boundary.find((candidate) => candidate.line === line);
-    assert.ok(finding, `expected a boundary finding on line ${line}: ${JSON.stringify(boundary, null, 2)}`);
-    assert.ok(
-      finding.sources.some((source) => source.includes("process.env.API_SECRET")),
-      JSON.stringify(finding.sources, null, 2),
-    );
+  const expected = ["direct", "block", "ordinary", "wrapped", "asyncResult", "nested", "mapped", "flattened", "functionMap", "withThis", "stored"];
+  assert.equal(boundary.length, expected.length);
+  for (const prop of expected) {
+    const finding = boundary.find((item) => item.message.includes(`prop "${prop}"`));
+    assert.ok(finding, `missing ${prop}`);
+    assert.ok(finding.sources.some((source) => source.includes("process.env.API_SECRET")));
   }
-});const ASSIGNMENT_TAINT = path.join(FIXTURES, "assignment-taint");
+  for (const rule of [RULES.EXTERNAL_SINK, RULES.SERVER_ONLY_EXPORT]) {
+    const matches = byRule(result.findings, rule);
+    assert.equal(matches.length, 1);
+    assert.ok(matches[0].sources.some((source) => source.includes("process.env.API_SECRET")));
+  }
+});
+
+const ASSIGNMENT_TAINT = path.join(FIXTURES, "assignment-taint");
 
 function assignmentBoundaries() {
   const config = defaultConfig();

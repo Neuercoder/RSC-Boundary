@@ -1,7 +1,7 @@
 # Specification — Functional Return Taint Propagation
 
 - **Version:** 1.0
-- **Status:** implemented (milestone 2026-09-17)
+- **Status:** implemented (milestone 2026-11-20)
 - **Product:** `rsc-boundary`
 
 ## Overview
@@ -16,7 +16,7 @@ the analyzer must preserve that flow into an RSC client-component boundary.
 The taint evaluator treats the following as transparent return-value flows:
 
 - an arrow function or function expression called immediately;
-- the trailing inline arrow function or function expression passed to `.map()`
+- the first argument when it is an inline arrow function or function expression passed to `.map()`
   or `.flatMap()`.
 
 Both expression-bodied arrows and block-bodied functions with a tainted
@@ -38,7 +38,7 @@ its callback returns tainted data.
 
 ## Deliberate boundaries
 
-- Only direct inline IIFEs are evaluated. Calls through an identifier keep the
+- Only direct inline IIFEs (including multiple parentheses) are evaluated. Calls through an identifier keep the
   existing declared-function taint behavior.
 - Only `map` and `flatMap` are callback-return transforms. Methods such as
   `forEach`, `filter`, `find`, and arbitrary third-party callbacks do not
@@ -50,4 +50,13 @@ its callback returns tainted data.
 
 The `test/fixtures/functional-taint` app uses neutral variable names and
 passes values through expression/block IIFEs plus `map`/`flatMap`. Analyzer and
-CLI tests assert all four flows reach the local client `Card` boundary.
+CLI tests assert exactly eleven client-boundary flows, one external-sink flow,
+and one server-export flow. Coverage includes async and ordinary functions,
+nested IIFEs, stored results, callbacks with a `thisArg`, and clean controls
+for public returns, discarded values, uncalled nested functions, `forEach`,
+`filter`, and a function supplied only as the `thisArg`.
+
+The second argument to `map`/`flatMap` is the `thisArg`, never the callback.
+Existing conservative receiver/argument taint still applies. Inline evaluation
+shares the expression evaluator's recursion budget; no argument binding,
+execution-aware control flow, or type-aware method resolution is added.
