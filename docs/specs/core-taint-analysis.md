@@ -173,7 +173,9 @@ model (`loadConfig`, `defaultConfig`, `mergeConfig`).
   are loop iteration (`for...of` / `for...in`), collection-callback element
   parameters (`rows.map((entry) => …)`), and mutating collection calls
   (`bucket.push(secret)`) — see
-  [iteration-collection-taint.md](iteration-collection-taint.md).
+  [iteration-collection-taint.md](iteration-collection-taint.md). Direct
+  IIFEs and inline `map` / `flatMap` callback returns also preserve taint —
+  see [functional-return-taint.md](functional-return-taint.md).
 - Direct immutable collection aliases are supported, but mutable, property,
   destructured, function-escaped, and cross-module aliases are not; see
   [collection-alias-mutation-taint.md](collection-alias-mutation-taint.md).
