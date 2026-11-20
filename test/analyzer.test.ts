@@ -13,7 +13,11 @@ const MEMBER_JSX = path.join(FIXTURES, "member-jsx");
 const RE_EXPORT = path.join(FIXTURES, "re-export");
 const AWAIT_TAINT = path.join(FIXTURES, "await-taint");
 const ITERATION_TAINT = path.join(FIXTURES, "iteration-taint");
+<<<<<<< HEAD
 const ELEMENT_TAINT = path.join(FIXTURES, "element-access-taint");
+=======
+const FUNCTIONAL_TAINT = path.join(FIXTURES, "functional-taint");
+>>>>>>> origin/main
 
 function analyze(dir: string, config = defaultConfig()) {
   const files = collectFiles(dir, config);
@@ -340,6 +344,7 @@ test("mutating collection calls merge argument taint into the receiver", () => {
   );
 });
 
+<<<<<<< HEAD
 test("bracket reads of sensitive members taint even when the base is unknown", () => {
   const result = analyze(ELEMENT_TAINT);
   const boundary = byRule(result.findings, RULES.CLIENT_BOUNDARY_PROP);
@@ -383,6 +388,26 @@ test("string, single-quote, and template bracket keys read like dot access", () 
     keyed.sources.some((source) => source.includes("loadConfig")),
     JSON.stringify(keyed.sources, null, 2),
   );
+=======
+test("immediately invoked functions and collection transforms preserve returned taint", () => {
+  const config = defaultConfig();
+  config.sensitiveIdentifiers = [];
+  config.sensitiveMembers = [];
+  const result = analyze(FUNCTIONAL_TAINT, config);
+  const boundary = byRule(result.findings, RULES.CLIENT_BOUNDARY_PROP);
+  const expected = ["direct", "block", "ordinary", "wrapped", "asyncResult", "nested", "mapped", "flattened", "functionMap", "withThis", "stored"];
+  assert.equal(boundary.length, expected.length);
+  for (const prop of expected) {
+    const finding = boundary.find((item) => item.message.includes(`prop "${prop}"`));
+    assert.ok(finding, `missing ${prop}`);
+    assert.ok(finding.sources.some((source) => source.includes("process.env.API_SECRET")));
+  }
+  for (const rule of [RULES.EXTERNAL_SINK, RULES.SERVER_ONLY_EXPORT]) {
+    const matches = byRule(result.findings, rule);
+    assert.equal(matches.length, 1);
+    assert.ok(matches[0].sources.some((source) => source.includes("process.env.API_SECRET")));
+  }
+>>>>>>> origin/main
 });
 
 const ASSIGNMENT_TAINT = path.join(FIXTURES, "assignment-taint");
@@ -417,4 +442,158 @@ test("destructuring assignments propagate taint to each supported target", () =>
   assert.deepEqual(boundary.map((f) => f.line).sort((a, b) => a - b),
     Array.from({ length: 15 }, (_, i) => 26 + i));
   assert.ok(boundary.every((f) => f.file.endsWith("page.tsx")));
+});
+
+test("computed object keys propagate taint without flagging public keys", () => {
+  const result = analyze(path.join(FIXTURES, "computed-object-keys"));
+  const boundary = byRule(result.findings, RULES.CLIENT_BOUNDARY_PROP);
+  const expected = ["direct", "indirect", "nested", "spread", "method", "getter", "setter", "inline"];
+  assert.equal(boundary.length, expected.length, JSON.stringify(result.findings, null, 2));
+  for (const name of expected) {
+    assert.ok(boundary.some((finding) => finding.message.includes(`prop "${name}"`)), name);
+  }
+  assert.ok(boundary.find((finding) => finding.message.includes('prop "direct"'))
+    ?.sources.some((source) => source.includes("process.env.INTERNAL_VALUE")));
+});
+
+test("comma expressions propagate only their final value to boundaries and sinks", () => {
+  const config = defaultConfig();
+  config.sensitiveIdentifiers = [];
+  config.sensitiveMembers = [];
+  const result = analyze(path.join(FIXTURES, "comma-expression"), config);
+  const boundary = byRule(result.findings, RULES.CLIENT_BOUNDARY_PROP);
+  const expected = ["direct", "chain", "indirect", "nested", "template"];
+  assert.equal(boundary.length, expected.length, JSON.stringify(result.findings, null, 2));
+  for (const name of expected) {
+    assert.ok(boundary.some((finding) => finding.message.includes(`prop "${name}"`)), name);
+  }
+  for (const name of ["direct", "chain", "nested", "template"]) {
+    assert.ok(boundary.find((finding) => finding.message.includes(`prop "${name}"`))
+      ?.sources.some((source) => source.includes("process.env.INTERNAL_VALUE")), name);
+  }
+  const sinks = byRule(result.findings, RULES.EXTERNAL_SINK);
+  assert.equal(sinks.length, 1, JSON.stringify(sinks, null, 2));
+  assert.equal(sinks[0].line, 8);
+  assert.ok(sinks[0].sources.some((source) => source.includes("process.env.INTERNAL_VALUE")));
+});
+
+test("arithmetic and bitwise results retain either operand's taint", () => {
+  const config = defaultConfig();
+  config.sensitiveIdentifiers = [];
+  config.sensitiveMembers = [];
+  const result = analyze(path.join(FIXTURES, "arithmetic-bitwise"), config);
+  const boundary = byRule(result.findings, RULES.CLIENT_BOUNDARY_PROP);
+  const operators = [
+    "subtract", "multiply", "divide", "remainder", "power",
+    "leftShift", "rightShift", "unsignedShift", "and", "or", "xor",
+  ];
+  const expected = [
+    ...operators.flatMap((name) => [`${name}Left`, `${name}Right`]),
+    "derived", "nested", "template",
+  ];
+  assert.equal(boundary.length, expected.length, JSON.stringify(result.findings, null, 2));
+  for (const name of expected) {
+    const finding = boundary.find((entry) => entry.message.includes(`prop "${name}"`));
+    assert.ok(finding, name);
+    assert.ok(finding.sources.some((source) => source.includes("process.env.INTERNAL_VALUE")), name);
+  }
+  const sinks = byRule(result.findings, RULES.EXTERNAL_SINK);
+  assert.equal(sinks.length, 1, JSON.stringify(sinks, null, 2));
+  assert.equal(sinks[0].line, 4);
+  assert.ok(sinks[0].sources.some((source) => source.includes("process.env.INTERNAL_VALUE")));
+});
+
+test("compound arithmetic and bitwise assignments taint results and updated targets", () => {
+  const config = defaultConfig();
+  config.sensitiveIdentifiers = [];
+  config.sensitiveMembers = [];
+  const result = analyze(path.join(FIXTURES, "compound-arithmetic"), config);
+  const boundary = byRule(result.findings, RULES.CLIENT_BOUNDARY_PROP);
+  const operators = [
+    "add", "subtract", "multiply", "divide", "remainder", "power",
+    "leftShift", "rightShift", "unsignedShift", "and", "or", "xor",
+  ];
+  const expected = [
+    ...operators.flatMap((name) => [`${name}Stored`, `${name}Left`, `${name}Right`]),
+    "property", "element", "nested",
+  ];
+  assert.deepEqual(boundary.map((finding) =>
+    /prop "([^"]+)"/.exec(finding.message)?.[1]).sort(), expected.sort());
+  for (const name of operators) {
+    assert.ok(boundary.find((finding) => finding.message.includes(`prop "${name}Right"`))
+      ?.sources.some((source) => source.includes("process.env.INTERNAL_VALUE")), name);
+  }
+  const sinks = byRule(result.findings, RULES.EXTERNAL_SINK);
+  assert.equal(sinks.length, 1, JSON.stringify(sinks, null, 2));
+  assert.ok(sinks[0].sources.some((source) => source.includes("process.env.INTERNAL_VALUE")));
+});
+
+test("tagged template results inherit tag function taint without sensitive-name heuristics", () => {
+  const config = defaultConfig();
+  config.sensitiveIdentifiers = [];
+  config.sensitiveMembers = [];
+  const { findings } = analyze(path.join(FIXTURES, "tagged-callee"), config);
+  const boundary = byRule(findings, RULES.CLIENT_BOUNDARY_PROP);
+  const expected = ["imported", "interpolated", "local", "member", "element", "stored", "nested", "interpolation", "configured"];
+  assert.equal(boundary.length, expected.length);
+  for (const prop of expected) {
+    assert.ok(boundary.some((finding) => finding.message.includes(`prop "${prop}"`)), `missing ${prop}`);
+  }
+  const imported = boundary.find((finding) => finding.message.includes('prop "imported"'));
+  assert.ok(imported?.sources?.some((source) => source.includes("@/server/render")));
+  const local = boundary.find((finding) => finding.message.includes('prop "local"'));
+  assert.ok(local?.sources?.some((source) => source.includes("process.env")));
+  const configured = boundary.find((finding) => finding.message.includes('prop "configured"'));
+  assert.ok(configured?.sources?.some((source) => source.includes("tagged template sql (data source)")));
+  const external = byRule(findings, RULES.EXTERNAL_SINK);
+  assert.equal(external.length, 1);
+  assert.ok(external[0].sources?.some((source) => source.includes("@/server/render")));
+});
+
+test("object methods and getters propagate sensitive returns without name heuristics", () => {
+  const config = defaultConfig();
+  config.sensitiveIdentifiers = [];
+  config.sensitiveMembers = [];
+  const { findings } = analyze(path.join(FIXTURES, "object-callable"), config);
+  const boundary = byRule(findings, RULES.CLIENT_BOUNDARY_PROP);
+  const expected = ["method", "getter", "asyncMethod", "nested", "stored", "inline", "element"];
+  assert.equal(boundary.length, expected.length);
+  for (const prop of expected) {
+    const finding = boundary.find((item) => item.message.includes(`prop "${prop}"`));
+    assert.ok(finding, `missing ${prop}`);
+    assert.ok(finding.sources.length > 0, `missing provenance for ${prop}`);
+  }
+  const element = boundary.find((finding) => finding.message.includes('prop "element"'));
+  assert.ok(element?.sources.some((source) => source.includes("process.env.INTERNAL_VALUE")));
+  const sinks = byRule(findings, RULES.EXTERNAL_SINK);
+  assert.equal(sinks.length, 1);
+  assert.ok(sinks[0].sources.some((source) => source.includes("methods.read")));
+  const exports = byRule(findings, RULES.SERVER_ONLY_EXPORT);
+  assert.equal(exports.length, 2);
+  for (const finding of exports) {
+    assert.ok(finding.sources.some((source) => source.includes("process.env.INTERNAL_VALUE")));
+  }
+});
+
+test("concise arrow functions propagate sensitive returns without name heuristics", () => {
+  const config = defaultConfig();
+  config.sensitiveIdentifiers = [];
+  config.sensitiveMembers = [];
+  const { findings } = analyze(path.join(FIXTURES, "concise-arrow"), config);
+  const boundary = byRule(findings, RULES.CLIENT_BOUNDARY_PROP);
+  const expected = ["direct", "asyncResult", "wrapped", "derived", "objectResult", "alias", "stored", "callable"];
+  assert.equal(boundary.length, expected.length);
+  for (const prop of expected) {
+    const finding = boundary.find((item) => item.message.includes(`prop "${prop}"`));
+    assert.ok(finding, `missing ${prop}`);
+    assert.ok(finding.sources.some((source) => source.includes("process.env")));
+  }
+  const sinks = byRule(findings, RULES.EXTERNAL_SINK);
+  assert.equal(sinks.length, 1);
+  assert.ok(sinks[0].sources.some((source) => source.includes("process.env")));
+  const exports = byRule(findings, RULES.SERVER_ONLY_EXPORT);
+  assert.equal(exports.length, 2);
+  for (const finding of exports) {
+    assert.ok(finding.sources.some((source) => source.includes("process.env")));
+  }
 });
