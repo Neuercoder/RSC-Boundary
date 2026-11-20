@@ -562,3 +562,4 @@ test("direct immutable collection aliases share mutation taint", () => {
   }
   assert.ok(!boundary.some((candidate) => candidate.line === 26), JSON.stringify(boundary, null, 2));
 }
+);

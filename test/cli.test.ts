@@ -202,3 +202,4 @@ test("runScan flags direct immutable collection-alias mutation leaks", () => {
   const boundary = result.findings.filter((finding) => finding.ruleId === "rsc/client-boundary-prop");
   assert.equal(boundary.length, 3, JSON.stringify(result.findings, null, 2));
 }
+);
