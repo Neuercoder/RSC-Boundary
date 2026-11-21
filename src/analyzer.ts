@@ -2193,6 +2193,9 @@ class FileWalker {
       case ts.SyntaxKind.SatisfiesExpression: {
         return this.taintReasonsWorker((node as ts.SatisfiesExpression).expression, depth + 1);
       }
+      case ts.SyntaxKind.TypeOfExpression: {
+        return this.taintReasonsWorker((node as ts.TypeOfExpression).expression, depth + 1);
+      }
       case ts.SyntaxKind.AwaitExpression: {
         return this.taintReasonsWorker((node as ts.AwaitExpression).expression, depth + 1);
       }
