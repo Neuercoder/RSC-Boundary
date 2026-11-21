@@ -211,3 +211,11 @@ test("built CLI detects typeof-derived leaks while excluding public and void res
   assert.equal(parsed.filter((f: { ruleId: string }) => f.ruleId === "rsc/external-sink").length, 1);
   assert.equal(parsed.filter((f: { ruleId: string }) => f.ruleId === "rsc/server-only-export").length, 1);
 });
+
+test("runScan reports comparison-result leaks end to end", () => {
+  const result = runScan([path.join(FIXTURES, "comparison-taint"), "--json"], process.cwd());
+  assert.equal(result.code, 1);
+  assert.equal(result.findings.filter((finding) => finding.ruleId === "rsc/client-boundary-prop").length, 19);
+  assert.equal(result.findings.filter((finding) => finding.ruleId === "rsc/external-sink").length, 1);
+  assert.equal(result.findings.length, 20, JSON.stringify(result.findings, null, 2));
+});
