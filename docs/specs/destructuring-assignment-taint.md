@@ -44,3 +44,12 @@ The neutral-name fixture in `test/fixtures/destructuring-assignment/` covers eac
 supported pattern, sensitive-member reads, a tainted source with a clean default,
 and clean RHS/default/property/index controls. Analyzer tests assert exact finding
 locations, and a built-CLI test checks JSON findings and exit status.
+
+The earlier `test/fixtures/destructuring-assignment-taint/` regressions are also
+retained: eleven client-boundary findings and four clean props, including
+source-provenance assertions with sensitive-name/member matching disabled,
+rest targets, shorthand defaults, and fixpoint propagation through later
+assignments. Its CLI regression checks the same eleven finding locations.
+Parenthesized assignment targets are unwrapped before pattern traversal.
+Ordinary assignments, logical/compound assignments, assignment-expression
+results, rule IDs, configuration, and CLI contracts remain unchanged.

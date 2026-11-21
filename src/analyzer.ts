@@ -1112,6 +1112,16 @@ class FileWalker {
 
   private processBinaryExpression(node: ts.BinaryExpression): void {
     const token = node.operatorToken.kind;
+    if (token === ts.SyntaxKind.EqualsToken) {
+      let target = node.left;
+      while (ts.isParenthesizedExpression(target)) {
+        target = target.expression;
+      }
+      if (ts.isObjectLiteralExpression(target) || ts.isArrayLiteralExpression(target)) {
+        this.bindAssignmentTarget(target, this.taintReasons(node.right));
+        return;
+      }
+    }
     if (
       token === ts.SyntaxKind.EqualsToken ||
       token === ts.SyntaxKind.QuestionQuestionEqualsToken ||
@@ -1119,11 +1129,6 @@ class FileWalker {
       token === ts.SyntaxKind.BarBarEqualsToken
     ) {
       const rhsReasons = this.taintReasons(node.right);
-      if (token === ts.SyntaxKind.EqualsToken &&
-          (ts.isObjectLiteralExpression(node.left) || ts.isArrayLiteralExpression(node.left))) {
-        this.bindAssignmentTarget(node.left, rhsReasons);
-        return;
-      }
       if (rhsReasons.length === 0) {
         return;
       }
