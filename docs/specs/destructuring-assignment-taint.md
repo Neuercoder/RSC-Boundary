@@ -44,3 +44,7 @@ The neutral-name fixture in `test/fixtures/destructuring-assignment/` covers eac
 supported pattern, sensitive-member reads, a tainted source with a clean default,
 and clean RHS/default/property/index controls. Analyzer tests assert exact finding
 locations, and a built-CLI test checks JSON findings and exit status.
+
+The additional `test/fixtures/destructuring-assignment-source/` fixture preserves
+source-expression and shorthand-default regressions from the 2026-10-23 milestone,
+with ten expected boundary findings and five clean/sibling controls.
