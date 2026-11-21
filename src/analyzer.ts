@@ -2182,6 +2182,7 @@ class FileWalker {
         return this.taintReasonsWorker((node as ts.PostfixUnaryExpression).operand, depth + 1);
       }
       case ts.SyntaxKind.AsExpression:
+      case ts.SyntaxKind.SatisfiesExpression:
       case ts.SyntaxKind.TypeAssertionExpression:
       case ts.SyntaxKind.NonNullExpression: {
         const asserted = node as
@@ -2190,14 +2191,13 @@ class FileWalker {
           | ts.NonNullExpression;
         return this.taintReasonsWorker(asserted.expression, depth + 1);
       }
-      case ts.SyntaxKind.SatisfiesExpression: {
-        return this.taintReasonsWorker((node as ts.SatisfiesExpression).expression, depth + 1);
-      }
       case ts.SyntaxKind.TypeOfExpression: {
         return this.taintReasonsWorker((node as ts.TypeOfExpression).expression, depth + 1);
       }
-      case ts.SyntaxKind.AwaitExpression: {
-        return this.taintReasonsWorker((node as ts.AwaitExpression).expression, depth + 1);
+      case ts.SyntaxKind.AwaitExpression:
+      case ts.SyntaxKind.YieldExpression: {
+        const inner = (node as ts.AwaitExpression | ts.YieldExpression).expression;
+        return inner ? this.taintReasonsWorker(inner, depth + 1) : [];
       }
       case ts.SyntaxKind.SpreadElement: {
         return this.taintReasonsWorker((node as ts.SpreadElement).expression, depth + 1);
