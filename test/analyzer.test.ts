@@ -549,6 +549,25 @@ test("concise arrow functions propagate sensitive returns without name heuristic
   }
 });
 
+test("typeof results retain source provenance without tainting public or void results", () => {
+  const config = defaultConfig();
+  config.sensitiveIdentifiers = [];
+  config.sensitiveMembers = [];
+  const { findings } = analyze(path.join(FIXTURES, "typeof-taint"), config);
+  const expected = ["direct", "stored", "wrapped", "nested", "template", "repeated", "fallback"];
+  const boundary = byRule(findings, RULES.CLIENT_BOUNDARY_PROP);
+  assert.equal(boundary.length, expected.length);
+  for (const prop of expected) {
+    assert.ok(boundary.some((finding) => finding.message.includes(`prop "${prop}"`)), `missing ${prop}`);
+  }
+  assert.equal(byRule(findings, RULES.EXTERNAL_SINK).length, 1);
+  assert.equal(byRule(findings, RULES.SERVER_ONLY_EXPORT).length, 1);
+  assert.equal(findings.length, 9);
+  for (const finding of findings) {
+    assert.ok(finding.sources.some((source) => source.includes("process.env")));
+  }
+});
+
 test("direct immutable collection aliases share mutation taint", () => {
   const config = defaultConfig();
   config.sensitiveIdentifiers = [];
@@ -561,5 +580,4 @@ test("direct immutable collection aliases share mutation taint", () => {
     assert.ok(finding.sources.some((source) => source.includes("process.env.API_SECRET")));
   }
   assert.ok(!boundary.some((candidate) => candidate.line === 26), JSON.stringify(boundary, null, 2));
-}
-);
+});
