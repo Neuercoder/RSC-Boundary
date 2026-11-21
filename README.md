@@ -74,6 +74,7 @@ CI (`.github/workflows/ci.yml`) runs install, build, test, and lint.
 - Tagged-template callee taint: [docs/specs/tagged-template-callee-taint.md](docs/specs/tagged-template-callee-taint.md)
 - Object method and getter return taint: [docs/specs/object-callable-return-taint.md](docs/specs/object-callable-return-taint.md)
 - Concise arrow return taint: [docs/specs/concise-arrow-return-taint.md](docs/specs/concise-arrow-return-taint.md)
+- Function-valued object-property return taint: [docs/specs/property-callable-return-taint.md](docs/specs/property-callable-return-taint.md)
 - Functional return taint (IIFEs, `.map`, `.flatMap`): [docs/specs/functional-return-taint.md](docs/specs/functional-return-taint.md)
 - Milestone tracker: [docs/milestones/](docs/milestones/)
 
@@ -100,7 +101,9 @@ Latest milestone: [typeof-result taint](docs/milestones/2026-11-21-typeof-result
 
 Earlier milestone: [functional return taint](docs/milestones/2026-11-20-functional-return-taint.md) ([specification](docs/specs/functional-return-taint.md)).
 
-Previous milestone: [concise arrow return taint](docs/milestones/2026-11-18-concise-arrow-return-taint.md) ([specification](docs/specs/concise-arrow-return-taint.md)).
+Previous milestone: [function-valued object-property return taint](docs/milestones/2026-11-19-property-callable-return-taint.md) ([specification](docs/specs/property-callable-return-taint.md)).
+
+Earlier milestone: [concise arrow return taint](docs/milestones/2026-11-18-concise-arrow-return-taint.md) ([specification](docs/specs/concise-arrow-return-taint.md)).
 
 Earlier milestone: [object method and getter return taint](docs/milestones/2026-11-17-object-callable-return-taint.md) ([specification](docs/specs/object-callable-return-taint.md)).
 
