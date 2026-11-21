@@ -24,11 +24,17 @@ arguments, array items, or declarations are not comma operators and are unchange
 
 ## Acceptance
 
-With sensitive-name heuristics disabled, the fixture must report exactly five
+With sensitive-name heuristics disabled, `test/fixtures/comma-expression/` must report exactly five
 client-boundary findings (direct, chained, variable-derived, object-nested, and
 interpolated results) and one external sink. Four public-result boundary
 controls and a public-result sink must remain unflagged. Direct results and the
 sink must retain environment-source provenance.
+
+Additional regression coverage in `test/fixtures/comma-taint/` checks earlier
+assignment effects followed by public results, nested sequences, and discarded
+values. With sensitive-name heuristics disabled, it must report exactly four
+client-boundary findings and one external sink. The CLI regression requires
+exit code `1` and exactly five findings for this fixture.
 
 ## Limits
 
