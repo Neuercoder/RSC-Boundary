@@ -71,6 +71,10 @@ CI (`.github/workflows/ci.yml`) runs install, build, test, and lint.
 - Computed object-key taint: [docs/specs/computed-object-key-taint.md](docs/specs/computed-object-key-taint.md)
 - Arithmetic and bitwise expression-result taint: [docs/specs/arithmetic-bitwise-taint.md](docs/specs/arithmetic-bitwise-taint.md)
 - Arithmetic and bitwise compound assignments: [docs/specs/compound-arithmetic-taint.md](docs/specs/compound-arithmetic-taint.md)
+- Tagged-template callee taint: [docs/specs/tagged-template-callee-taint.md](docs/specs/tagged-template-callee-taint.md)
+- Object method and getter return taint: [docs/specs/object-callable-return-taint.md](docs/specs/object-callable-return-taint.md)
+- Concise arrow return taint: [docs/specs/concise-arrow-return-taint.md](docs/specs/concise-arrow-return-taint.md)
+- Functional return taint (IIFEs, `.map`, `.flatMap`): [docs/specs/functional-return-taint.md](docs/specs/functional-return-taint.md)
 - Milestone tracker: [docs/milestones/](docs/milestones/)
 
 ## Current status
@@ -92,9 +96,19 @@ expression results). Assignment-taint behavior and limitations are documented
 in the linked spec and milestone. Known limitation (see spec §11): cross-module
 type-aware dataflow is not yet covered.
 
-Latest milestone: [arithmetic and bitwise compound-assignment taint](docs/milestones/2026-11-15-compound-arithmetic-taint.md) ([specification](docs/specs/compound-arithmetic-taint.md)).
+Latest milestone: [typeof-result taint](docs/milestones/2026-11-21-typeof-result-taint.md) ([specification](docs/specs/typeof-result-taint.md)).
 
-Previous milestone: [arithmetic and bitwise expression-result taint](docs/milestones/2026-11-14-arithmetic-bitwise-taint.md) ([specification](docs/specs/arithmetic-bitwise-taint.md)).
+Earlier milestone: [functional return taint](docs/milestones/2026-11-20-functional-return-taint.md) ([specification](docs/specs/functional-return-taint.md)).
+
+Previous milestone: [concise arrow return taint](docs/milestones/2026-11-18-concise-arrow-return-taint.md) ([specification](docs/specs/concise-arrow-return-taint.md)).
+
+Earlier milestone: [object method and getter return taint](docs/milestones/2026-11-17-object-callable-return-taint.md) ([specification](docs/specs/object-callable-return-taint.md)).
+
+Earlier milestone: [tagged-template callee taint](docs/milestones/2026-11-16-tagged-template-callee-taint.md) ([specification](docs/specs/tagged-template-callee-taint.md)).
+
+Earlier milestone: [arithmetic and bitwise compound-assignment taint](docs/milestones/2026-11-15-compound-arithmetic-taint.md) ([specification](docs/specs/compound-arithmetic-taint.md)).
+
+Earlier milestone: [arithmetic and bitwise expression-result taint](docs/milestones/2026-11-14-arithmetic-bitwise-taint.md) ([specification](docs/specs/arithmetic-bitwise-taint.md)).
 
 Earlier milestone: [comparison-result taint](docs/milestones/2026-11-13-comparison-result-taint.md) ([specification](docs/specs/comparison-result-taint.md)).
 
