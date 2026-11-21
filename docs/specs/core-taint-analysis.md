@@ -69,6 +69,9 @@ Taint flows through (conservative, per-file, fixpoint over ≤ 6 passes):
 - Calls: result is tainted when the callee is tainted (e.g. a server-module
   binding like `getUser(...)`), when any argument is tainted, or when the
   callee matches data-source patterns.
+- Direct immutable collection aliases (`const alias = bucket`) share taint
+  from supported collection mutations with the original binding and transitive
+  direct aliases; see [collection-alias-mutation-taint.md](collection-alias-mutation-taint.md).
 - Functions: a declared/assigned function whose body returns a tainted value
   is itself tainted, so exports and later calls of it are caught.
 
@@ -173,6 +176,9 @@ model (`loadConfig`, `defaultConfig`, `mergeConfig`).
   [iteration-collection-taint.md](iteration-collection-taint.md). Direct
   IIFEs and inline `map` / `flatMap` callback returns also preserve taint —
   see [functional-return-taint.md](functional-return-taint.md).
+- Direct immutable collection aliases are supported, but mutable, property,
+  destructured, function-escaped, and cross-module aliases are not; see
+  [collection-alias-mutation-taint.md](collection-alias-mutation-taint.md).
 - Data sources are matched by name/call patterns, not by full type-aware
   dataflow across modules; false positives are expected and suppressible.
 - Assignment tracking remains monotonic within the existing fixpoint: control-flow

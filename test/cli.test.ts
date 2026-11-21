@@ -14,6 +14,7 @@ const MEMBER_JSX = path.join(FIXTURES, "member-jsx");
 const RE_EXPORT = path.join(FIXTURES, "re-export");
 const AWAIT_TAINT = path.join(FIXTURES, "await-taint");
 const ITERATION_TAINT = path.join(FIXTURES, "iteration-taint");
+const COLLECTION_ALIAS_TAINT = path.join(FIXTURES, "collection-alias-taint");
 const FUNCTIONAL_TAINT = path.join(FIXTURES, "functional-taint");
 const CLI = path.resolve(__dirname, "..", "..", "dist", "cli.js");
 
@@ -210,4 +211,11 @@ test("built CLI detects typeof-derived leaks while excluding public and void res
   assert.equal(parsed.filter((f: { ruleId: string }) => f.ruleId === "rsc/client-boundary-prop").length, 7);
   assert.equal(parsed.filter((f: { ruleId: string }) => f.ruleId === "rsc/external-sink").length, 1);
   assert.equal(parsed.filter((f: { ruleId: string }) => f.ruleId === "rsc/server-only-export").length, 1);
+});
+
+test("runScan flags direct immutable collection-alias mutation leaks", () => {
+  const result = runScan([COLLECTION_ALIAS_TAINT, "--json"], process.cwd());
+  assert.equal(result.code, 1);
+  const boundary = result.findings.filter((finding) => finding.ruleId === "rsc/client-boundary-prop");
+  assert.equal(boundary.length, 3, JSON.stringify(result.findings, null, 2));
 });
