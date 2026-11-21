@@ -2191,6 +2191,9 @@ class FileWalker {
           | ts.NonNullExpression;
         return this.taintReasonsWorker(asserted.expression, depth + 1);
       }
+      case ts.SyntaxKind.TypeOfExpression: {
+        return this.taintReasonsWorker((node as ts.TypeOfExpression).expression, depth + 1);
+      }
       case ts.SyntaxKind.AwaitExpression:
       case ts.SyntaxKind.YieldExpression: {
         const inner = (node as ts.AwaitExpression | ts.YieldExpression).expression;

@@ -100,7 +100,9 @@ expression results). Assignment-taint behavior and limitations are documented
 in the linked spec and milestone. Known limitation (see spec §11): cross-module
 type-aware dataflow is not yet covered.
 
-Latest milestone: [functional return taint](docs/milestones/2026-11-20-functional-return-taint.md) ([specification](docs/specs/functional-return-taint.md)).
+Latest milestone: [typeof-result taint](docs/milestones/2026-11-21-typeof-result-taint.md) ([specification](docs/specs/typeof-result-taint.md)).
+
+Earlier milestone: [functional return taint](docs/milestones/2026-11-20-functional-return-taint.md) ([specification](docs/specs/functional-return-taint.md)).
 
 Previous milestone: [concise arrow return taint](docs/milestones/2026-11-18-concise-arrow-return-taint.md) ([specification](docs/specs/concise-arrow-return-taint.md)).
 
