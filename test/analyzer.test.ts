@@ -427,30 +427,6 @@ test("comma expressions propagate only their final value to boundaries and sinks
   assert.ok(sinks[0].sources.some((source) => source.includes("process.env.INTERNAL_VALUE")));
 });
 
-test("equality and relational comparisons preserve sensitive operands on either side", () => {
-  const config = defaultConfig();
-  config.sensitiveIdentifiers = [];
-  config.sensitiveMembers = [];
-  const result = analyze(path.join(FIXTURES, "comparison-taint"), config);
-  const boundary = byRule(result.findings, RULES.CLIENT_BOUNDARY_PROP);
-  const operators = ["equal", "notEqual", "strictEqual", "strictNotEqual", "less", "lessEqual", "greater", "greaterEqual"];
-  const expected = [...operators.flatMap((name) => [`${name}Left`, `${name}Right`]), "derived", "nested", "template"];
-  assert.equal(boundary.length, expected.length, JSON.stringify(result.findings, null, 2));
-  for (const name of expected) {
-    const finding = boundary.find((entry) => entry.message.includes(`prop "${name}"`));
-    assert.ok(finding, name);
-    assert.ok(finding.sources.length > 0, name);
-    if (name !== "derived") {
-      assert.ok(finding.sources.some((source) => source.includes("process.env.INTERNAL_VALUE")), name);
-    }
-  }
-  const sinks = byRule(result.findings, RULES.EXTERNAL_SINK);
-  assert.equal(sinks.length, 1, JSON.stringify(sinks, null, 2));
-  assert.equal(sinks[0].line, 6);
-  assert.ok(sinks[0].sources.some((source) => source.includes("process.env.INTERNAL_VALUE")));
-  assert.equal(result.findings.length, expected.length + 1);
-});
-
 test("arithmetic and bitwise results retain either operand's taint", () => {
   const config = defaultConfig();
   config.sensitiveIdentifiers = [];
@@ -586,6 +562,28 @@ test("typeof results retain source provenance without tainting public or void re
   assert.equal(byRule(findings, RULES.EXTERNAL_SINK).length, 1);
   assert.equal(byRule(findings, RULES.SERVER_ONLY_EXPORT).length, 1);
   assert.equal(findings.length, 9);
+  for (const finding of findings) {
+    assert.ok(finding.sources.some((source) => source.includes("process.env")));
+  }
+});
+
+test("comparison results retain either operand's provenance without tainting public results", () => {
+  const config = defaultConfig();
+  config.sensitiveIdentifiers = [];
+  config.sensitiveMembers = [];
+  const { findings } = analyze(path.join(FIXTURES, "comparison-taint"), config);
+  const operators = ["equal", "notEqual", "strictEqual", "strictNotEqual", "less",
+    "lessEqual", "greater", "greaterEqual", "member", "instance"];
+  const expected = operators.flatMap((operator) => [operator + "Left", operator + "Right"])
+    .concat(["stored", "wrapped", "nested", "template", "repeated", "logical"]);
+  const boundary = byRule(findings, RULES.CLIENT_BOUNDARY_PROP);
+  assert.equal(boundary.length, expected.length);
+  for (const prop of expected) {
+    assert.ok(boundary.some((finding) => finding.message.includes(`prop "${prop}"`)), `missing ${prop}`);
+  }
+  assert.equal(byRule(findings, RULES.EXTERNAL_SINK).length, 1);
+  assert.equal(byRule(findings, RULES.SERVER_ONLY_EXPORT).length, 1);
+  assert.equal(findings.length, 28);
   for (const finding of findings) {
     assert.ok(finding.sources.some((source) => source.includes("process.env")));
   }

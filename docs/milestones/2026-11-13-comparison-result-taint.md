@@ -1,5 +1,10 @@
 # Comparison-result taint
 
+This records the original eight-operator implementation and its verification.
+The [2026-11-22 milestone](2026-11-22-comparison-result-taint.md) supersedes
+this scope with membership/type comparisons and expanded regression coverage;
+the shared specification and fixture now describe that broader implementation.
+
 Implemented sensitive-result propagation for the eight equality and relational
 operators. Boolean comparisons now preserve operand taint and existing source
 reasons, preventing comparison results from silently crossing client boundaries

@@ -1,37 +1,51 @@
-# Comparison-result taint propagation
+# Specification — Comparison Result Taint
 
-## Goal
-
-Detect sensitive information exposed through equality or relational comparisons.
-A boolean result can reveal information about a sensitive operand, so comparison
-is not treated as sanitization.
+- **Version:** 1.0
+- **Status:** implemented (milestone 2026-11-22)
+- **Product:** `rsc-boundary`
 
 ## Behavior
 
-- For `==`, `!=`, `===`, `!==`, `<`, `<=`, `>`, and `>=`, propagate
-  taint from either operand using the existing binary-expression evaluator.
-- Preserve existing source reasons and the existing first-tainted-operand
-  preference when both operands are sensitive.
-- Apply the behavior anywhere expression taint is evaluated, including variable
-  initializers, nested object values, template substitutions, client-component
-  props, and external-sink arguments.
-- Comparisons of public operands remain clean.
-- No new rules, configuration, dependencies, or changes to finding metadata.
+Comparison results retain sensitive-source provenance from either operand.
+A boolean can reveal information about server data; comparison is not
+sanitization, consistent with the analyzer's conservative treatment of
+derived expressions.
 
-## Acceptance
+Supported operators: `==`, `!=`, `===`, `!==`, `<`, `<=`, `>`, `>=`,
+`in`, and `instanceof`.
 
-The `comparison-taint` fixture, with sensitive-name heuristics disabled, yields
-exactly 19 client-boundary findings and one external-sink finding:
+```tsx
+const enabled = process.env.INTERNAL_VALUE === "enabled";
+return <Client enabled={enabled} />; // rsc/client-boundary-prop
+```
 
-- All eight operators are exercised with the sensitive source on each side.
-- Derived variables, nested object values, and template substitutions propagate
-  the result; inline uses retain the environment-source reason.
-- All eight public/public comparisons and a public sink remain clean.
-- The CLI returns exit code 1 and reports the same 20 findings.
+Apply the same propagation to stored, wrapped, nested, template, repeated,
+and logically composed results, external sinks, and server-module exports.
+Reuse the existing finding rules, provenance limits, and recursion budget.
+No dependencies, configuration options, or source categories are added.
 
-## Limits
+## Boundaries and clean controls
 
-This is conservative expression-level dataflow, not constant evaluation or
-control-flow feasibility analysis. It does not prove whether a comparison is
-always true or false. Membership/type operators (`in`, `instanceof`), arithmetic,
-alias tracking, and cross-module type-aware analysis are outside this milestone.
+- Comparisons with public operands stay clean.
+- Both left and right operand sources are recognized independently; the
+  existing evaluator reports the first tainted operand's provenance.
+- A discarded comma operand does not taint the final value.
+- `void` results remain clean, including when used in comparisons.
+- No constant folding, type inference, runtime operand validation, or new
+  statement-level implicit control-flow tracking is introduced.
+- TypeScript type-position operators are outside this milestone.
+- Existing assignment and arithmetic behavior is unchanged.
+
+## Verification
+
+The `comparison-taint` fixture covers all ten operators with a source in
+each operand position, six composed/stored results, one external sink, and
+one server export. Public comparisons for every operator, a discarded
+comparison, a void result, and a public typeof comparison stay clean.
+Fixtures are parsed, not executed or typechecked; operand combinations test
+conservative syntactic tracking rather than JavaScript runtime validity.
+
+Analyzer tests disable sensitive-name heuristics and require process.env
+provenance for all 28 findings. The built CLI must emit exactly 26 client
+boundary findings, one sink finding, and one export finding, exiting with
+code 1.
