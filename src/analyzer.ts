@@ -2148,6 +2148,16 @@ class FileWalker {
           op === ts.SyntaxKind.AmpersandToken ||
           op === ts.SyntaxKind.BarToken ||
           op === ts.SyntaxKind.CaretToken ||
+          op === ts.SyntaxKind.EqualsEqualsToken ||
+          op === ts.SyntaxKind.ExclamationEqualsToken ||
+          op === ts.SyntaxKind.EqualsEqualsEqualsToken ||
+          op === ts.SyntaxKind.ExclamationEqualsEqualsToken ||
+          op === ts.SyntaxKind.LessThanToken ||
+          op === ts.SyntaxKind.LessThanEqualsToken ||
+          op === ts.SyntaxKind.GreaterThanToken ||
+          op === ts.SyntaxKind.GreaterThanEqualsToken ||
+          op === ts.SyntaxKind.InKeyword ||
+          op === ts.SyntaxKind.InstanceOfKeyword ||
           op === ts.SyntaxKind.QuestionQuestionToken ||
           op === ts.SyntaxKind.AmpersandAmpersandToken ||
           op === ts.SyntaxKind.BarBarToken ||
