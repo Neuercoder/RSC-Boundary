@@ -213,9 +213,27 @@ test("built CLI detects typeof-derived leaks while excluding public and void res
   assert.equal(parsed.filter((f: { ruleId: string }) => f.ruleId === "rsc/server-only-export").length, 1);
 });
 
+<<<<<<< HEAD
 test("runScan flags direct immutable collection-alias mutation leaks", () => {
   const result = runScan([COLLECTION_ALIAS_TAINT, "--json"], process.cwd());
   assert.equal(result.code, 1);
   const boundary = result.findings.filter((finding) => finding.ruleId === "rsc/client-boundary-prop");
   assert.equal(boundary.length, 3, JSON.stringify(result.findings, null, 2));
+=======
+test("built CLI detects comparison-derived leaks while excluding public results", () => {
+  let output = "";
+  try {
+    execFileSync(process.execPath, [CLI, "scan", path.join(FIXTURES, "comparison-taint"), "--json"], { encoding: "utf8" });
+    assert.fail("expected exit code 1");
+  } catch (error) {
+    const err = error as { status: number; stdout: string };
+    assert.equal(err.status, 1);
+    output = err.stdout;
+  }
+  const parsed = JSON.parse(output);
+  assert.equal(parsed.length, 28);
+  assert.equal(parsed.filter((f: { ruleId: string }) => f.ruleId === "rsc/client-boundary-prop").length, 26);
+  assert.equal(parsed.filter((f: { ruleId: string }) => f.ruleId === "rsc/external-sink").length, 1);
+  assert.equal(parsed.filter((f: { ruleId: string }) => f.ruleId === "rsc/server-only-export").length, 1);
+>>>>>>> origin/main
 });
