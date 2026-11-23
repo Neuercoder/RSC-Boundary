@@ -588,3 +588,23 @@ test("comparison results retain either operand's provenance without tainting pub
     assert.ok(finding.sources.some((source) => source.includes("process.env")));
   }
 });
+
+test("element reads retain sensitive index or base provenance without tainting public reads", () => {
+  const config = defaultConfig();
+  config.sensitiveIdentifiers = [];
+  config.sensitiveMembers = [];
+  const { findings } = analyze(path.join(FIXTURES, "element-index-taint"), config);
+  const expected = ["direct", "array", "optional", "stored", "assigned", "wrapped",
+    "nested", "template", "repeated", "base"];
+  const boundary = byRule(findings, RULES.CLIENT_BOUNDARY_PROP);
+  assert.equal(boundary.length, expected.length);
+  for (const prop of expected) {
+    assert.ok(boundary.some((finding) => finding.message.includes(`prop "${prop}"`)), `missing ${prop}`);
+  }
+  assert.equal(byRule(findings, RULES.EXTERNAL_SINK).length, 1);
+  assert.equal(byRule(findings, RULES.SERVER_ONLY_EXPORT).length, 1);
+  assert.equal(findings.length, 12);
+  for (const finding of findings) {
+    assert.ok(finding.sources.some((source) => source.includes("process.env")));
+  }
+});
