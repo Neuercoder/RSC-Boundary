@@ -2061,7 +2061,15 @@ class FileWalker {
         if (tracked) {
           return tracked.slice(0, 3);
         }
-        return this.taintReasonsWorker(access.expression, depth + 1);
+        const baseReasons = this.taintReasonsWorker(access.expression, depth + 1);
+        if (baseReasons.length > 0) {
+          return baseReasons.slice(0, 3);
+        }
+        // Selecting a public value with a sensitive index reveals information
+        // about that index, including through optional element access.
+        return access.argumentExpression
+          ? this.taintReasonsWorker(access.argumentExpression, depth + 1)
+          : [];
       }
       case ts.SyntaxKind.CallExpression:
       case ts.SyntaxKind.NewExpression: {
