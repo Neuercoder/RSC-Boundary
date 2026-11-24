@@ -2102,6 +2102,7 @@ class FileWalker {
         if (tracked) {
           return tracked.slice(0, 3);
         }
+<<<<<<< HEAD
         const key = this.staticElementKey(access.argumentExpression);
         if (key !== null) {
           // A tainted normalized member (`vault.password` from a
@@ -2117,6 +2118,16 @@ class FileWalker {
           }
         }
         return this.taintReasonsWorker(access.expression, depth + 1);
+=======
+        const base = this.taintReasonsWorker(access.expression, depth + 1);
+        if (base.length > 0) {
+          return base.slice(0, 3);
+        }
+        // A sensitive key can reveal server data by selecting a public value.
+        return access.argumentExpression
+          ? this.taintReasonsWorker(access.argumentExpression, depth + 1)
+          : [];
+>>>>>>> origin/main
       }
       case ts.SyntaxKind.CallExpression:
       case ts.SyntaxKind.NewExpression: {
@@ -2203,6 +2214,16 @@ class FileWalker {
           op === ts.SyntaxKind.AmpersandToken ||
           op === ts.SyntaxKind.BarToken ||
           op === ts.SyntaxKind.CaretToken ||
+          op === ts.SyntaxKind.EqualsEqualsToken ||
+          op === ts.SyntaxKind.ExclamationEqualsToken ||
+          op === ts.SyntaxKind.EqualsEqualsEqualsToken ||
+          op === ts.SyntaxKind.ExclamationEqualsEqualsToken ||
+          op === ts.SyntaxKind.LessThanToken ||
+          op === ts.SyntaxKind.LessThanEqualsToken ||
+          op === ts.SyntaxKind.GreaterThanToken ||
+          op === ts.SyntaxKind.GreaterThanEqualsToken ||
+          op === ts.SyntaxKind.InKeyword ||
+          op === ts.SyntaxKind.InstanceOfKeyword ||
           op === ts.SyntaxKind.QuestionQuestionToken ||
           op === ts.SyntaxKind.AmpersandAmpersandToken ||
           op === ts.SyntaxKind.BarBarToken ||
@@ -2247,6 +2268,9 @@ class FileWalker {
       }
       case ts.SyntaxKind.SatisfiesExpression: {
         return this.taintReasonsWorker((node as ts.SatisfiesExpression).expression, depth + 1);
+      }
+      case ts.SyntaxKind.TypeOfExpression: {
+        return this.taintReasonsWorker((node as ts.TypeOfExpression).expression, depth + 1);
       }
       case ts.SyntaxKind.AwaitExpression: {
         return this.taintReasonsWorker((node as ts.AwaitExpression).expression, depth + 1);
