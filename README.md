@@ -70,6 +70,11 @@ CI (`.github/workflows/ci.yml`) runs install, build, test, and lint.
 - Comma-expression result taint: [docs/specs/comma-expression-taint.md](docs/specs/comma-expression-taint.md)
 - Computed object-key taint: [docs/specs/computed-object-key-taint.md](docs/specs/computed-object-key-taint.md)
 - Arithmetic and bitwise expression-result taint: [docs/specs/arithmetic-bitwise-taint.md](docs/specs/arithmetic-bitwise-taint.md)
+- Arithmetic and bitwise compound assignments: [docs/specs/compound-arithmetic-taint.md](docs/specs/compound-arithmetic-taint.md)
+- Tagged-template callee taint: [docs/specs/tagged-template-callee-taint.md](docs/specs/tagged-template-callee-taint.md)
+- Object method and getter return taint: [docs/specs/object-callable-return-taint.md](docs/specs/object-callable-return-taint.md)
+- Concise arrow return taint: [docs/specs/concise-arrow-return-taint.md](docs/specs/concise-arrow-return-taint.md)
+- Functional return taint (IIFEs, `.map`, `.flatMap`): [docs/specs/functional-return-taint.md](docs/specs/functional-return-taint.md)
 - Milestone tracker: [docs/milestones/](docs/milestones/)
 
 ## Current status
@@ -91,9 +96,27 @@ expression results). Assignment-taint behavior and limitations are documented
 in the linked spec and milestone. Known limitation (see spec §11): cross-module
 type-aware dataflow is not yet covered.
 
-Latest milestone: [arithmetic and bitwise expression-result taint](docs/milestones/2026-11-14-arithmetic-bitwise-taint.md) ([specification](docs/specs/arithmetic-bitwise-taint.md)).
+Latest milestone: [element-access key taint](docs/milestones/2026-11-24-element-key-taint.md) ([specification](docs/specs/element-key-taint.md)).
 
-Previous milestone: [comma-expression result taint](docs/milestones/2026-11-11-comma-expression-taint.md) ([specification](docs/specs/comma-expression-taint.md)).
+Computed object/array lookups preserve sensitive-key provenance, including optional access and composed keys. Public lookups, discarded values, and void results stay clean. Verified with 55 passing tests, build, and lint.
+
+Earlier milestone: [comparison-result taint](docs/milestones/2026-11-22-comparison-result-taint.md) ([specification](docs/specs/comparison-result-taint.md)).
+
+Earlier milestone: [typeof-result taint](docs/milestones/2026-11-21-typeof-result-taint.md) ([specification](docs/specs/typeof-result-taint.md)).
+
+Earlier milestone: [functional return taint](docs/milestones/2026-11-20-functional-return-taint.md) ([specification](docs/specs/functional-return-taint.md)).
+
+Previous milestone: [concise arrow return taint](docs/milestones/2026-11-18-concise-arrow-return-taint.md) ([specification](docs/specs/concise-arrow-return-taint.md)).
+
+Earlier milestone: [object method and getter return taint](docs/milestones/2026-11-17-object-callable-return-taint.md) ([specification](docs/specs/object-callable-return-taint.md)).
+
+Earlier milestone: [tagged-template callee taint](docs/milestones/2026-11-16-tagged-template-callee-taint.md) ([specification](docs/specs/tagged-template-callee-taint.md)).
+
+Earlier milestone: [arithmetic and bitwise compound-assignment taint](docs/milestones/2026-11-15-compound-arithmetic-taint.md) ([specification](docs/specs/compound-arithmetic-taint.md)).
+
+Earlier milestone: [arithmetic and bitwise expression-result taint](docs/milestones/2026-11-14-arithmetic-bitwise-taint.md) ([specification](docs/specs/arithmetic-bitwise-taint.md)).
+
+Earlier milestone: [comma-expression result taint](docs/milestones/2026-11-11-comma-expression-taint.md) ([specification](docs/specs/comma-expression-taint.md)).
 
 Earlier milestone: [computed object-key taint](docs/milestones/2026-11-08-computed-object-key-taint.md) ([specification](docs/specs/computed-object-key-taint.md)).
 

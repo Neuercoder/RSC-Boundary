@@ -51,6 +51,11 @@ intrinsic host element) is not reported.
 
 ## 5. Propagation rules
 
+Element-access results inherit taint from a sensitive computed key as well as
+the base (including optional access). Existing tracked access/base provenance
+takes precedence; public keys, discarded comma operands, and void results
+retain their existing semantics. See [element-access key taint](element-key-taint.md).
+
 Taint flows through (conservative, per-file, fixpoint over ≤ 6 passes):
 
 - Variable declarations and assignments (`const x = src`, `x = tainted`,
@@ -170,7 +175,9 @@ model (`loadConfig`, `defaultConfig`, `mergeConfig`).
   are loop iteration (`for...of` / `for...in`), collection-callback element
   parameters (`rows.map((entry) => …)`), and mutating collection calls
   (`bucket.push(secret)`) — see
-  [iteration-collection-taint.md](iteration-collection-taint.md).
+  [iteration-collection-taint.md](iteration-collection-taint.md). Direct
+  IIFEs and inline `map` / `flatMap` callback returns also preserve taint —
+  see [functional-return-taint.md](functional-return-taint.md).
 - Data sources are matched by name/call patterns, not by full type-aware
   dataflow across modules; false positives are expected and suppressible.
 - Assignment tracking remains monotonic within the existing fixpoint: control-flow
