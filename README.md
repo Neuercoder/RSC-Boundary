@@ -96,7 +96,11 @@ expression results). Assignment-taint behavior and limitations are documented
 in the linked spec and milestone. Known limitation (see spec §11): cross-module
 type-aware dataflow is not yet covered.
 
-Latest milestone: [comparison-result taint](docs/milestones/2026-11-22-comparison-result-taint.md) ([specification](docs/specs/comparison-result-taint.md)).
+Latest milestone: [element-access key taint](docs/milestones/2026-11-24-element-key-taint.md) ([specification](docs/specs/element-key-taint.md)).
+
+Computed object/array lookups preserve sensitive-key provenance, including optional access and composed keys. Public lookups, discarded values, and void results stay clean. Verified with 55 passing tests, build, and lint.
+
+Earlier milestone: [comparison-result taint](docs/milestones/2026-11-22-comparison-result-taint.md) ([specification](docs/specs/comparison-result-taint.md)).
 
 Earlier milestone: [typeof-result taint](docs/milestones/2026-11-21-typeof-result-taint.md) ([specification](docs/specs/typeof-result-taint.md)).
 

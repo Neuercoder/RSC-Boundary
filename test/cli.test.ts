@@ -228,3 +228,21 @@ test("built CLI detects comparison-derived leaks while excluding public results"
   assert.equal(parsed.filter((f: { ruleId: string }) => f.ruleId === "rsc/external-sink").length, 1);
   assert.equal(parsed.filter((f: { ruleId: string }) => f.ruleId === "rsc/server-only-export").length, 1);
 });
+
+test("built CLI reports element-key taint with no clean-control findings", () => {
+  let status = 0;
+  let stdout = "";
+  try {
+    stdout = execFileSync(process.execPath, [CLI, "scan", path.join(FIXTURES, "element-key-taint"), "--json"], { encoding: "utf8" });
+  } catch (error) {
+    const execError = error as { status?: number; stdout?: string };
+    status = execError.status ?? -1;
+    stdout = execError.stdout ?? "";
+  }
+  assert.equal(status, 1);
+  const parsed = JSON.parse(stdout) as { ruleId: string }[];
+  assert.equal(parsed.filter((finding) => finding.ruleId === "rsc/client-boundary-prop").length, 12);
+  assert.equal(parsed.filter((finding) => finding.ruleId === "rsc/external-sink").length, 1);
+  assert.equal(parsed.filter((finding) => finding.ruleId === "rsc/server-only-export").length, 1);
+  assert.equal(parsed.length, 14);
+});
