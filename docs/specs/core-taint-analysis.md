@@ -51,6 +51,11 @@ intrinsic host element) is not reported.
 
 ## 5. Propagation rules
 
+Element-access results inherit taint from a sensitive computed key as well as
+the base (including optional access). Existing tracked access/base provenance
+takes precedence; public keys, discarded comma operands, and void results
+retain their existing semantics. See [element-access key taint](element-key-taint.md).
+
 Taint flows through (conservative, per-file, fixpoint over ≤ 6 passes):
 
 - Variable declarations and assignments (`const x = src`, `x = tainted`,
