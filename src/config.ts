@@ -123,16 +123,20 @@ function isPathAliases(value: unknown): value is Record<string, string[]> {
   return Object.values(value).every(isStringArray);
 }
 
-function isSuppression(value: unknown): value is Suppression {
-  if (typeof value !== "object" || value === null) {
+/** A suppression must narrow findings with at least one well-formed selector. */
+export function isSuppression(value: unknown): value is Suppression {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
     return false;
   }
   const record = value as Record<string, unknown>;
+  const selectors = [record.file, record.ruleId, record.message];
+  const isSelector = (item: unknown): item is string =>
+    typeof item === "string" && item.trim().length > 0;
   return (
-    (record.file === undefined || typeof record.file === "string") &&
-    (record.ruleId === undefined || typeof record.ruleId === "string") &&
-    (record.message === undefined || typeof record.message === "string") &&
-    (record.line === undefined || typeof record.line === "number")
+    selectors.every((item) => item === undefined || isSelector(item)) &&
+    (record.line === undefined ||
+      (typeof record.line === "number" && Number.isSafeInteger(record.line) && record.line > 0)) &&
+    (selectors.some(isSelector) || record.line !== undefined)
   );
 }
 

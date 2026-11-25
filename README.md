@@ -96,7 +96,11 @@ expression results). Assignment-taint behavior and limitations are documented
 in the linked spec and milestone. Known limitation (see spec §11): cross-module
 type-aware dataflow is not yet covered.
 
-Latest milestone: [element-access key taint](docs/milestones/2026-11-24-element-key-taint.md) ([specification](docs/specs/element-key-taint.md)).
+Latest milestone: [suppression selector validation](docs/milestones/2026-11-25-suppression-validation.md) ([specification](docs/specs/suppression-validation.md)).
+Malformed entries can no longer silently hide findings; valid suppression
+matching is unchanged. Verification: 58 passing tests, build, and lint.
+
+Earlier milestone: [element-access key taint](docs/milestones/2026-11-24-element-key-taint.md) ([specification](docs/specs/element-key-taint.md)).
 
 Computed object/array lookups preserve sensitive-key provenance, including optional access and composed keys. Public lookups, discarded values, and void results stay clean. Verified with 55 passing tests, build, and lint.
 

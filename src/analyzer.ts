@@ -24,7 +24,7 @@ import * as fs from "fs";
 import * as path from "path";
 import * as ts from "typescript";
 
-import { RscBoundaryConfig, Suppression } from "./config";
+import { isSuppression, RscBoundaryConfig, Suppression } from "./config";
 
 // These assignments both return a value derived from their operands and
 // update their target. Keep expression evaluation and target tracking aligned.
@@ -311,6 +311,9 @@ export function analyzeFiles(files: string[], options: AnalyzeOptions = {}): Ana
 
 function isSuppressed(finding: Finding, suppress: Suppression[]): boolean {
   return suppress.some((rule) => {
+    if (!isSuppression(rule)) {
+      return false;
+    }
     if (rule.file !== undefined && !finding.file.includes(rule.file)) {
       return false;
     }

@@ -118,7 +118,11 @@ located at the scan root or any ancestor:
 
 Arrays replace defaults entirely. `suppress` entries match a finding only when
 *all* provided fields match (file substring, exact ruleId, message substring,
-exact 1-based line). `pathAliases` maps tsconfig-style import aliases to
+exact 1-based line). Entries must contain at least one non-blank string
+selector or a positive safe-integer line number. Invalid entries (including
+arrays and selector-free objects) are ignored, both in JSON configuration and
+programmatic options; see [suppression-validation.md](suppression-validation.md).
+`pathAliases` maps tsconfig-style import aliases to
 replacement paths and ships with the Next.js default `"@/*": ["./*"]`; see
 [path-alias-resolution.md](path-alias-resolution.md).
 
