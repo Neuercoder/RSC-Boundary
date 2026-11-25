@@ -14,6 +14,7 @@ const MEMBER_JSX = path.join(FIXTURES, "member-jsx");
 const RE_EXPORT = path.join(FIXTURES, "re-export");
 const AWAIT_TAINT = path.join(FIXTURES, "await-taint");
 const ITERATION_TAINT = path.join(FIXTURES, "iteration-taint");
+const COLLECTION_ALIAS_TAINT = path.join(FIXTURES, "collection-alias-taint");
 const FUNCTIONAL_TAINT = path.join(FIXTURES, "functional-taint");
 const CLI = path.resolve(__dirname, "..", "..", "dist", "cli.js");
 
@@ -245,4 +246,12 @@ test("built CLI reports element-key taint with no clean-control findings", () =>
   assert.equal(parsed.filter((finding) => finding.ruleId === "rsc/external-sink").length, 1);
   assert.equal(parsed.filter((finding) => finding.ruleId === "rsc/server-only-export").length, 1);
   assert.equal(parsed.length, 14);
+});
+
+
+test("runScan flags direct immutable collection-alias mutation leaks", () => {
+  const result = runScan([COLLECTION_ALIAS_TAINT, "--json"], process.cwd());
+  assert.equal(result.code, 1);
+  const boundary = result.findings.filter((finding) => finding.ruleId === "rsc/client-boundary-prop");
+  assert.equal(boundary.length, 3, JSON.stringify(result.findings, null, 2));
 });
