@@ -96,7 +96,11 @@ expression results). Assignment-taint behavior and limitations are documented
 in the linked spec and milestone. Known limitation (see spec §11): cross-module
 type-aware dataflow is not yet covered.
 
-Latest milestone: [suppression selector validation](docs/milestones/2026-11-25-suppression-validation.md) ([specification](docs/specs/suppression-validation.md)).
+Latest milestone: [process environment source recognition](docs/milestones/2026-11-26-process-env-access.md) ([specification](docs/specs/process-env-access.md)).
+
+Static bracket access to `process["env"]` is recognized alongside `process.env`, while unrelated process metadata stays clean.
+
+Earlier milestone: [suppression selector validation](docs/milestones/2026-11-25-suppression-validation.md) ([specification](docs/specs/suppression-validation.md)).
 Malformed entries can no longer silently hide findings; valid suppression
 matching is unchanged. Verification: 58 passing tests, build, and lint.
 

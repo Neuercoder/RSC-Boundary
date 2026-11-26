@@ -608,3 +608,23 @@ test("element access retains sensitive key provenance without tainting public lo
     assert.ok(finding.sources.some((source) => source.includes("process.env")));
   }
 });
+
+test("recognizes static process env accesses without tainting process metadata", () => {
+  const config = defaultConfig();
+  config.sensitiveIdentifiers = [];
+  config.sensitiveMembers = [];
+  const result = analyze(path.join(FIXTURES, "process-env-access"), config);
+  const boundary = byRule(result.findings, RULES.CLIENT_BOUNDARY_PROP);
+  assert.equal(boundary.length, 6);
+  for (const name of ["dotted", "bracket", "nested", "optional", "template", "stored"]) {
+    assert.ok(boundary.some((finding) => finding.message.includes(`prop "${name}"`)), name);
+  }
+  assert.equal(byRule(result.findings, RULES.EXTERNAL_SINK).length, 1);
+  assert.equal(byRule(result.findings, RULES.SERVER_ONLY_EXPORT).length, 1);
+  assert.equal(result.findings.length, 8);
+  for (const finding of result.findings) {
+    assert.ok(finding.sources.length > 0);
+  }
+  const nested = boundary.find((finding) => finding.message.includes('prop "nested"'));
+  assert.ok(nested?.sources.includes("process.env"));
+});
