@@ -2038,8 +2038,8 @@ class FileWalker {
         const access = node as ts.PropertyAccessExpression;
         const base = access.expression;
         const name = access.name.text;
-        if (ts.isIdentifier(base) && base.text === "process") {
-          return [name === "env" ? "process.env" : `process.env.${name}`];
+        if (ts.isIdentifier(base) && base.text === "process" && name === "env") {
+          return ["process.env"];
         }
         const tracked = this.analysis.taint.get(access.getText(this.analysis.sf));
         if (tracked) {
@@ -2060,6 +2060,14 @@ class FileWalker {
       }
       case ts.SyntaxKind.ElementAccessExpression: {
         const access = node as ts.ElementAccessExpression;
+        const key = access.argumentExpression;
+        if (
+          ts.isIdentifier(access.expression) && access.expression.text === "process" &&
+          key && (ts.isStringLiteral(key) || ts.isNoSubstitutionTemplateLiteral(key)) &&
+          key.text === "env"
+        ) {
+          return ["process.env"];
+        }
         const tracked = this.analysis.taint.get(access.getText(this.analysis.sf));
         if (tracked) {
           return tracked.slice(0, 3);
