@@ -96,7 +96,13 @@ expression results). Assignment-taint behavior and limitations are documented
 in the linked spec and milestone. Known limitation (see spec §11): cross-module
 type-aware dataflow is not yet covered.
 
-Latest milestone: [process environment source recognition](docs/milestones/2026-11-26-process-env-access.md) ([specification](docs/specs/process-env-access.md)).
+Latest milestone: [delete-result taint](docs/milestones/2026-11-27-delete-result-taint.md) ([specification](docs/specs/delete-result-taint.md)).
+
+Sensitive deletion results retain provenance across client props, external sinks,
+and server exports. Public properties and discarded results stay clean.
+Verified with 62 passing tests, build, and lint.
+
+Earlier milestone: [process environment source recognition](docs/milestones/2026-11-26-process-env-access.md) ([specification](docs/specs/process-env-access.md)).
 
 Static bracket access to `process["env"]` is recognized alongside `process.env`, while unrelated process metadata stays clean.
 

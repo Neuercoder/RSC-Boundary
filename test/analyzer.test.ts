@@ -628,3 +628,21 @@ test("recognizes static process env accesses without tainting process metadata",
   const nested = boundary.find((finding) => finding.message.includes('prop "nested"'));
   assert.ok(nested?.sources.includes("process.env"));
 });
+
+test("preserves sensitive provenance through delete results with clean discarded results", () => {
+  const config = defaultConfig();
+  config.sensitiveIdentifiers = [];
+  config.sensitiveMembers = [];
+  const result = analyze(path.join(FIXTURES, "delete-result-taint"), config);
+  const boundary = byRule(result.findings, RULES.CLIENT_BOUNDARY_PROP);
+  assert.equal(boundary.length, 8);
+  for (const name of ["direct", "optional", "stored", "wrapped", "nested", "template", "keyed", "returned"]) {
+    assert.ok(boundary.some((finding) => finding.message.includes(`prop "${name}"`)), name);
+  }
+  assert.equal(byRule(result.findings, RULES.EXTERNAL_SINK).length, 1);
+  assert.equal(byRule(result.findings, RULES.SERVER_ONLY_EXPORT).length, 1);
+  assert.equal(result.findings.length, 10);
+  for (const finding of result.findings) {
+    assert.ok(finding.sources.some((source) => source.includes("process.env")));
+  }
+});
