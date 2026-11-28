@@ -7,3 +7,6 @@ coverage/
 *.tsbuildinfo
 .eslintcache
 *.log
+
+# Hoplite per-thread runtime metadata (never commit)
+.hoplite/
