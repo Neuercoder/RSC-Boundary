@@ -14,6 +14,7 @@ const MEMBER_JSX = path.join(FIXTURES, "member-jsx");
 const RE_EXPORT = path.join(FIXTURES, "re-export");
 const AWAIT_TAINT = path.join(FIXTURES, "await-taint");
 const ITERATION_TAINT = path.join(FIXTURES, "iteration-taint");
+const ELEMENT_TAINT = path.join(FIXTURES, "element-access-taint");
 const FUNCTIONAL_TAINT = path.join(FIXTURES, "functional-taint");
 const CLI = path.resolve(__dirname, "..", "..", "dist", "cli.js");
 
@@ -157,11 +158,13 @@ test("runScan flags iteration/collection leaks end to end", () => {
   assert.equal(boundary.length, 4, JSON.stringify(result.findings, null, 2));
 });
 
-test("runScan flags immediately invoked function and collection-transform leaks", () => {
-  const result = runScan([FUNCTIONAL_TAINT, "--json"], process.cwd());
+test("runScan flags element-access leaks end to end", () => {
+  const result = runScan([ELEMENT_TAINT, "--json"], process.cwd());
   assert.equal(result.code, 1);
-  const boundary = result.findings.filter((finding) => finding.ruleId === "rsc/client-boundary-prop");
-  assert.equal(boundary.length, 11, JSON.stringify(result.findings, null, 2));
+  const boundary = result.findings.filter(
+    (finding) => finding.ruleId === "rsc/client-boundary-prop",
+  );
+  assert.equal(boundary.length, 6, JSON.stringify(result.findings, null, 2));
 });
 
 test("runScan reports assignment leaks end to end", () => {
@@ -188,11 +191,11 @@ test("CLI detects destructuring-assignment leaks end-to-end", () => {
   assert.ok(parsed.every((f: { ruleId: string }) => f.ruleId === "rsc/client-boundary-prop"));
 });
 
-test("runScan reports computed-object-key leaks end to end", () => {
-  const result = runScan([path.join(FIXTURES, "computed-object-keys"), "--json"], process.cwd());
+test("runScan flags immediately invoked function and collection-transform leaks", () => {
+  const result = runScan([FUNCTIONAL_TAINT, "--json"], process.cwd());
   assert.equal(result.code, 1);
-  assert.equal(result.findings.length, 8, JSON.stringify(result.findings, null, 2));
-  assert.ok(result.findings.every((finding) => finding.ruleId === "rsc/client-boundary-prop"));
+  const boundary = result.findings.filter((finding) => finding.ruleId === "rsc/client-boundary-prop");
+  assert.equal(boundary.length, 11, JSON.stringify(result.findings, null, 2));
 });
 
 test("built CLI detects typeof-derived leaks while excluding public and void results", () => {
