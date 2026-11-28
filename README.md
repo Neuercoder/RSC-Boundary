@@ -137,6 +137,8 @@ Earlier milestone: [arithmetic and bitwise compound-assignment taint](docs/miles
 
 Earlier milestone: [arithmetic and bitwise expression-result taint](docs/milestones/2026-11-14-arithmetic-bitwise-taint.md) ([specification](docs/specs/arithmetic-bitwise-taint.md)).
 
+Earlier milestone: [comparison-result taint](docs/milestones/2026-11-13-comparison-result-taint.md) ([specification](docs/specs/comparison-result-taint.md)).
+
 Earlier milestone: [comma-expression result taint](docs/milestones/2026-11-11-comma-expression-taint.md) ([specification](docs/specs/comma-expression-taint.md)).
 
 Earlier milestone: [computed object-key taint](docs/milestones/2026-11-08-computed-object-key-taint.md) ([specification](docs/specs/computed-object-key-taint.md)).
