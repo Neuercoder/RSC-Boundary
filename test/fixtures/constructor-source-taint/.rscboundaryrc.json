@@ -1,0 +1,7 @@
+{
+  "sources": {
+    "sensitiveIdentifiers": [],
+    "sensitiveMembers": [],
+    "calls": ["^Vault$", "^providers\\.open$", "^createClient$"]
+  }
+}

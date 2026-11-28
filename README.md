@@ -96,7 +96,14 @@ expression results). Assignment-taint behavior and limitations are documented
 in the linked spec and milestone. Known limitation (see spec §11): cross-module
 type-aware dataflow is not yet covered.
 
-Latest milestone: [delete-result taint](docs/milestones/2026-11-27-delete-result-taint.md) ([specification](docs/specs/delete-result-taint.md)).
+Latest milestone: [constructor-source taint](docs/milestones/2026-11-28-constructor-source-taint.md) ([specification](docs/specs/constructor-source-taint.md)).
+
+Configured data sources are recognized in constructor invocations as well as
+calls and tagged templates. Sensitive arguments keep their provenance; public
+constructors and discarded results stay clean.
+Verified with 65 passing tests, build, and lint.
+
+Earlier milestone: [delete-result taint](docs/milestones/2026-11-27-delete-result-taint.md) ([specification](docs/specs/delete-result-taint.md)).
 
 Sensitive deletion results retain provenance across client props, external sinks,
 and server exports. Public properties and discarded results stay clean.

@@ -46,7 +46,7 @@ intrinsic host element) is not reported.
 | Sensitive identifiers | Identifier in value position matching `sources.sensitiveIdentifiers` (default: `token`, `password`, `passwd`, `secret`, `api[_-]?key`, `apikey`, `credential`, `private[_-]?key`, `access[_-]?token`, `session[_-]?id`, `authorization`, `bearer`, `auth[_-]?token`). |
 | Sensitive member reads | Property read (`user.password`, `config.apiKey`, …) whose name matches `sources.sensitiveMembers` — even when the base object is not itself tainted. |
 | Server-module imports | Any binding imported from a module matching `sources.serverModules` (default: `server-only`, `next/headers`, `next/cookies`, `next/server`, `@/server*`, paths containing `db`/`prisma`/`database`/`sql`/`server` segments). |
-| Data-source calls | Call/tagged-template whose callee matches `sources.calls` (default: `db.*`, `prisma.*`, `pool.*`, `sql…`, `supabase.*`, `createClient…`). |
+| Data-source calls | Call/constructor/tagged-template whose callee matches `sources.calls` (default: `db.*`, `prisma.*`, `pool.*`, `sql…`, `supabase.*`, `createClient…`). |
 | Per-request data | `cookies()`, `headers()`, `draftMode()` in a file that imports `next/headers` or `next/cookies`. |
 
 ## 5. Propagation rules

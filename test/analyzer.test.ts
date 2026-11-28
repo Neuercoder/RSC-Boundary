@@ -646,3 +646,36 @@ test("preserves sensitive provenance through delete results with clean discarded
     assert.ok(finding.sources.some((source) => source.includes("process.env")));
   }
 });
+
+test("recognizes configured constructor sources without tainting public or discarded results", () => {
+  const config = defaultConfig();
+  config.sensitiveIdentifiers = [];
+  config.sensitiveMembers = [];
+  config.sourceCalls = ["^Vault$", "^providers\\.open$", "^createClient$"];
+  const result = analyze(path.join(FIXTURES, "constructor-source-taint"), config);
+  const boundary = byRule(result.findings, RULES.CLIENT_BOUNDARY_PROP);
+  assert.equal(boundary.length, 10);
+  for (const name of ["direct", "bare", "member", "stored", "wrapped", "nested", "template", "returned", "defaultSource", "argument"]) {
+    assert.ok(boundary.some((finding) => finding.message.includes(`prop "${name}"`)), name);
+  }
+  assert.equal(byRule(result.findings, RULES.EXTERNAL_SINK).length, 1);
+  assert.equal(byRule(result.findings, RULES.SERVER_ONLY_EXPORT).length, 1);
+  assert.equal(result.findings.length, 12);
+  for (const finding of result.findings) {
+    const argument = finding.message.includes('prop "argument"');
+    assert.ok(finding.sources.some((source) =>
+      argument ? source.includes("process.env") : source.includes("(data source)")));
+  }
+});
+
+test("default source patterns recognize constructor invocations", () => {
+  const config = defaultConfig();
+  config.sensitiveIdentifiers = [];
+  config.sensitiveMembers = [];
+  const result = analyze(path.join(FIXTURES, "constructor-source-taint"), config);
+  const boundary = byRule(result.findings, RULES.CLIENT_BOUNDARY_PROP);
+  assert.equal(boundary.length, 2);
+  assert.equal(result.findings.length, 2);
+  assert.ok(boundary.some((finding) => finding.message.includes('prop "defaultSource"')));
+  assert.ok(boundary.some((finding) => finding.message.includes('prop "argument"')));
+});

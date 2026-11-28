@@ -282,3 +282,21 @@ test("built CLI reports sensitive delete results but not public or discarded res
   assert.equal(parsed.filter((finding) => finding.ruleId === "rsc/server-only-export").length, 1);
   assert.equal(parsed.length, 10);
 });
+
+test("built CLI recognizes configured constructor sources and clean controls", () => {
+  let status = 0;
+  let stdout = "";
+  try {
+    stdout = execFileSync(process.execPath, [CLI, "scan", path.join(FIXTURES, "constructor-source-taint"), "--json"], { encoding: "utf8" });
+  } catch (error) {
+    const execError = error as { status?: number; stdout?: string };
+    status = execError.status ?? -1;
+    stdout = execError.stdout ?? "";
+  }
+  assert.equal(status, 1);
+  const parsed = JSON.parse(stdout) as { ruleId: string }[];
+  assert.equal(parsed.filter((finding) => finding.ruleId === "rsc/client-boundary-prop").length, 10);
+  assert.equal(parsed.filter((finding) => finding.ruleId === "rsc/external-sink").length, 1);
+  assert.equal(parsed.filter((finding) => finding.ruleId === "rsc/server-only-export").length, 1);
+  assert.equal(parsed.length, 12);
+});

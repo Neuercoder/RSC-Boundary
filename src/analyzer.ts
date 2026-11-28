@@ -2101,11 +2101,14 @@ class FileWalker {
         if (calleeReasons.length > 0) {
           return calleeReasons.slice(0, 3);
         }
+        // Configured sources also produce sensitive values when constructed.
+        // Keep argument/callee provenance ahead of this fallback, as for calls.
+        const callee = call.expression.getText(this.analysis.sf);
+        if (this.callRE.some((re) => re.test(callee))) {
+          const operation = ts.isNewExpression(call) ? "new" : "call";
+          return [`${operation} ${callee} (data source)`];
+        }
         if (ts.isCallExpression(call)) {
-          const callee = call.expression.getText(this.analysis.sf);
-          if (this.callRE.some((re) => re.test(callee))) {
-            return [`call ${callee} (data source)`];
-          }
           if (
             this.analysis.serverReason &&
             ts.isIdentifier(call.expression) &&
