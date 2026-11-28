@@ -2246,6 +2246,18 @@ class FileWalker {
             }
           }
           if (ts.isPropertyAssignment(prop)) {
+            // Function-valued properties expose their returns just like object
+            // methods. Unwrap parentheses without scanning unrelated closures.
+            let value = prop.initializer;
+            while (ts.isParenthesizedExpression(value)) {
+              value = value.expression;
+            }
+            if (ts.isArrowFunction(value) || ts.isFunctionExpression(value)) {
+              const reasons = this.functionReturnsTainted(value);
+              if (reasons) {
+                return reasons.slice(0, 3);
+              }
+            }
             const reasons = this.taintReasonsWorker(prop.initializer, depth + 1);
             if (reasons.length > 0) {
               return reasons.slice(0, 3);
